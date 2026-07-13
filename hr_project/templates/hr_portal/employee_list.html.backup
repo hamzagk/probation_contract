@@ -1,0 +1,1117 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Employees - HR Portal{% endblock %}
+{% block page_title %}Employee Management{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+    <!-- Header Section -->
+    <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h3 class="text-2xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-users text-blue-600 mr-3"></i>Employee Management
+                </h3>
+                <p class="text-gray-600 mt-1">Manage and track employee information and probation status</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'import_employees' %}" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2.5 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center">
+                    <i class="fas fa-file-import mr-2"></i>Import
+                </a>
+                <a href="{% url 'export_employees' %}" class="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 py-2.5 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center">
+                    <i class="fas fa-file-export mr-2"></i>Export
+                </a>
+                <a href="{% url 'employee_create' %}" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-5 py-2.5 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Add Employee
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Filters -->
+    <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap gap-4">
+                <button class="filter-btn active px-4 py-2 rounded-lg bg-blue-100 text-blue-800 font-medium" data-filter="all">
+                    <i class="fas fa-users mr-2"></i>All Employees
+                    <span class="ml-2 bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-full">{{ page_obj.paginator.count }}</span>
+                </button>
+                <button class="filter-btn px-4 py-2 rounded-lg bg-green-100 text-green-800 font-medium" data-filter="active">
+                    <i class="fas fa-user-check mr-2"></i>Active
+                    <span class="ml-2 bg-green-200 text-green-800 text-xs px-2 py-1 rounded-full">{{ active_count|default:0 }}</span>
+                </button>
+                <button class="filter-btn px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 font-medium" data-filter="ending-soon">
+                    <i class="fas fa-hourglass-half mr-2"></i>Ending Soon
+                    <span class="ml-2 bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded-full">{{ ending_soon_count|default:0 }}</span>
+                </button>
+                <button class="filter-btn px-4 py-2 rounded-lg bg-blue-100 text-blue-800 font-medium" data-filter="completed">
+                    <i class="fas fa-check-circle mr-2"></i>Completed
+                    <span class="ml-2 bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-full">{{ completed_count|default:0 }}</span>
+                </button>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="relative">
+                    <input type="text" id="searchInput" placeholder="Search employees..."
+                           class="w-full md:w-64 px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Table -->
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-10">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[80px]">S.#</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[180px]">Employee</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[150px]">Designation</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[120px]">Department</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[100px]">Start Date</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[100px]">End Date</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[140px]">Probation Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[120px]">Days Left</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[120px]">Progress</th>
+                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[200px]">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for employee in page_obj %}
+                <tr class="employee-row {% if employee.is_probation_ending_soon %}bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500{% elif employee.probation_status == 'Completed' %}bg-green-50 border-l-4 border-green-500{% else %}hover:bg-gray-50{% endif %} transition-all duration-200" data-status="{{ employee.probation_status|lower }}">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ employee.employee_id }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
+                                {{ employee.name|first|upper }}
+                            </div>
+                            <div class="ml-3">
+                                <div class="text-sm font-medium text-gray-900">{{ employee.name }}</div>
+                                <div class="text-xs text-gray-500">ID: {{ employee.employee_id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 truncate max-w-[150px]" title="{{ employee.designation }}">{{ employee.designation }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 truncate max-w-[120px]" title="{{ employee.department }}">
+                            <i class="fas fa-building mr-1 text-xs"></i>{{ employee.department }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ employee.start_date }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ employee.end_date }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap probation-status-cell">
+                        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                            {% if employee.probation_status == 'Active' %}bg-green-100 text-green-800
+                            {% elif employee.probation_status == 'Ending Soon' %}bg-yellow-100 text-yellow-800 animate-pulse
+                            {% elif employee.probation_status == 'Extended' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            <i class="fas {% if employee.probation_status == 'Active' %}fa-play
+                               {% elif employee.probation_status == 'Ending Soon' %}fa-hourglass-half
+                               {% elif employee.probation_status == 'Extended' %}fa-history
+                               {% else %}fa-check-circle{% endif %} mr-1"></i>
+                            {{ employee.probation_status }}
+                            {% if employee.is_extended %}
+                                <span class="ml-1">(Extended)</span>
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm {% if employee.days_until_probation_end <= 1 %}text-red-600 font-bold{% elif employee.days_until_probation_end <= 15 %}text-orange-500 font-medium{% else %}text-gray-500{% endif %}">
+                        {{ employee.days_until_probation_end }}
+                        {% if employee.days_until_probation_end <= 1 and employee.days_until_probation_end >= 0 %}
+                            <div class="mt-1">
+                                <span class="inline-flex items-center text-xs text-red-600">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> Expires today
+                                </span>
+                            </div>
+                        {% elif employee.days_until_probation_end <= 15 and employee.days_until_probation_end > 1 %}
+                            <div class="mt-1">
+                                <span class="inline-flex items-center text-xs text-orange-500">
+                                    <i class="fas fa-clock mr-1"></i> Expires soon
+                                </span>
+                            </div>
+                        {% elif employee.days_until_probation_end > 15 %}
+                            <div class="mt-1">
+                                <span class="inline-flex items-center text-xs text-green-600">
+                                    <i class="fas fa-check-circle mr-1"></i> More than 15 days
+                                </span>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
+                                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full"
+                                     style="width: {{ employee.probation_completion_percent|default:0 }}%"></div>
+                            </div>
+                            <span class="ml-2 text-xs text-gray-500 min-w-[40px]">{{ employee.probation_completion_percent|default:0 }}%</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                        <div class="flex flex-wrap gap-1.5">
+                            <!-- Generate Document Dropdown -->
+                            <div class="relative group">
+                                <button class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs">
+                                    <i class="fas fa-file-alt mr-1"></i> Gen
+                                </button>
+                                <div class="absolute hidden group-hover:block bg-white shadow-xl rounded-lg p-2 w-64 z-20 mt-1 left-0 border border-gray-200">
+                                    {% for template in templates %}
+                                    <a href="{% url 'generate_document_from_template' employee.employee_id template.id %}"
+                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md mb-1 first:mt-1">
+                                        <i class="fas fa-file-word text-blue-500 mr-2"></i>{{ template.get_template_type_display }}
+                                    </a>
+                                    {% endfor %}
+                                    <!-- Add direct links to new probation letter types -->
+                                    {% if employee.probation_status == 'Completed' %}
+                                    <a href="{% url 'generate_probation_confirmation' employee.employee_id %}"
+                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md mb-1">
+                                        <i class="fas fa-file-contract text-green-500 mr-2"></i>Probation Confirmation Letter
+                                    </a>
+                                    {% endif %}
+                                    {% if employee.probation_status == 'Extended' %}
+                                    <a href="{% url 'generate_probation_extension' employee.employee_id %}"
+                                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md mb-1">
+                                        <i class="fas fa-file-contract text-yellow-500 mr-2"></i>Probation Extension Letter
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Email Notification Button for expiring probations -->
+                            {% if employee.days_until_probation_end <= 30 and employee.days_until_probation_end >= 0 %}
+                                {% if user.is_staff or user.is_superuser %}
+                                    <form method="post" action="{% url 'send_department_email' employee.employee_id %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" onclick="return confirm('Are you sure you want to send a probation expiry notification for {{ employee.name }} to the {{ employee.department }} department?');"
+                                                class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs">
+                                            <i class="fas fa-envelope mr-1"></i> E
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <button onclick="openEmailModal('{{ employee.name }}', '{{ employee.employee_id }}', '{{ employee.department }}', '{{ employee.designation }}', '{{ employee.end_date }}')"
+                                        class="text-orange-600 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs">
+                                    <i class="fas fa-envelope mr-1"></i> CE
+                                </button>
+                            {% endif %}
+
+                            <!-- Action Buttons based on probation status -->
+                            {% if employee.probation_status == 'Completed' %}
+                                <span class="text-green-600 bg-green-50 px-2.5 py-1 rounded-md text-xs flex items-center">
+                                    <i class="fas fa-check-circle mr-1"></i>Done
+                                </span>
+                            {% elif employee.probation_status == 'Extended' %}
+                                <button class="approve-btn text-yellow-600 hover:text-yellow-800 bg-yellow-50 hover:bg-yellow-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs" data-employee-id="{{ employee.employee_id }}" data-action="extend">
+                                    <i class="fas fa-calendar-plus mr-1"></i> Ext
+                                </button>
+                            {% elif employee.is_probation_ending_soon and employee.probation_status != 'Completed' %}
+                                <button class="approve-btn text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs" data-employee-id="{{ employee.employee_id }}" data-action="approve">
+                                    <i class="fas fa-check mr-1"></i> App
+                                </button>
+                            {% else %}
+                                <span class="text-gray-500 bg-gray-100 px-2.5 py-1 rounded-md text-xs">N/A</span>
+                            {% endif %}
+
+                            <!-- Edit Button -->
+                            <a href="{% url 'employee_edit' employee.employee_id %}" class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs">
+                                <i class="fas fa-edit"></i>
+                            </a>
+
+                            <!-- Delete Button -->
+                            <a href="{% url 'employee_delete' employee.employee_id %}" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md transition-all duration-200 flex items-center text-xs">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center justify-center">
+                            <i class="fas fa-users text-gray-300 text-6xl mb-6"></i>
+                            <h3 class="text-xl font-medium text-gray-900 mb-2">No employees found</h3>
+                            <p class="text-gray-500 mb-6">Get started by adding a new employee or importing from Excel</p>
+                            <div class="flex flex-wrap gap-3">
+                                <a href="{% url 'import_employees' %}" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center">
+                                    <i class="fas fa-file-import mr-2"></i>Import Employees
+                                </a>
+                                <a href="{% url 'employee_create' %}" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center">
+                                    <i class="fas fa-plus mr-2"></i>Add Employee
+                                </a>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div class="flex-1 flex justify-between sm:hidden">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Previous
+                </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Next
+                </a>
+            {% endif %}
+        </div>
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    Showing page <span class="font-medium">{{ page_obj.number }}</span> of <span class="font-medium">{{ page_obj.paginator.num_pages }}</span>
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">Previous</span>
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </a>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <a href="?page={{ num }}" class="relative z-10 inline-flex items-center px-4 py-2 border text-sm font-medium border-blue-500 bg-blue-50 text-blue-600">
+                                {{ num }}
+                            </a>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <a href="?page={{ num }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                {{ num }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">Next</span>
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </a>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Email Modal -->
+<div id="emailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+    {% csrf_token %}
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 scale-95 opacity-0" id="emailModalContent">
+        <div class="p-6">
+            <div class="flex justify-between items-center border-b pb-4">
+                <h3 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-envelope text-blue-600 mr-3"></i>Send Probation Notification
+                </h3>
+                <button onclick="closeEmailModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mt-6" id="emailModalBody">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                        <input type="text" id="modalEmployeeName" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" readonly>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                        <input type="text" id="modalEmployeeDept" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" readonly>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Recipient Email</label>
+                    <input type="email" id="recipientEmail" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter department head email">
+                    <p class="mt-2 text-sm text-gray-500">Enter the email of the department head or concerned authority</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                        <input type="text" id="emailSubject" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" value="Probation Period Ending Soon - Action Required">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message Template</label>
+                        <select id="messageTemplate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="standard">Standard Probation Notification</option>
+                            <option value="urgent">Urgent Review Required</option>
+                            <option value="custom">Custom Message</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                    <textarea id="emailMessage" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-40" placeholder="Enter your message here..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-4 pt-6 border-t">
+                <button onclick="closeEmailModal()" class="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200 font-medium">
+                    Cancel
+                </button>
+                <button onclick="sendEmailNotification()" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-md hover:shadow-lg font-medium">
+                    <i class="fas fa-paper-plane mr-2"></i>Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Filter functionality
+    document.querySelectorAll('.filter-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            // Remove active class from all buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-blue-100', 'text-blue-800');
+                btn.classList.add('bg-gray-100', 'text-gray-700');
+            });
+
+            // Add active class to clicked button
+            this.classList.add('active', 'bg-blue-100', 'text-blue-800');
+            this.classList.remove('bg-gray-100', 'text-gray-700');
+
+            const filter = this.getAttribute('data-filter');
+            filterEmployees(filter);
+        });
+    });
+
+    function filterEmployees(filter) {
+        const rows = document.querySelectorAll('.employee-row');
+
+        rows.forEach(row => {
+            if (filter === 'all') {
+                row.style.display = '';
+            } else {
+                const status = row.getAttribute('data-status');
+                if (filter === 'completed' && status.includes('complet')) {
+                    row.style.display = '';
+                } else if (filter === 'active' && status.includes('activ')) {
+                    row.style.display = '';
+                } else if (filter === 'ending-soon' && (status.includes('ending') || status.includes('soon'))) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const rows = document.querySelectorAll('.employee-row');
+
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    // Email modal functions
+    function openEmailModal(name, id, dept, designation, endDate) {
+        document.getElementById('modalEmployeeName').value = `${name} (ID: ${id})`;
+        document.getElementById('modalEmployeeDept').value = dept;
+
+        // Pre-fill message based on template selection
+        const templateSelect = document.getElementById('messageTemplate');
+        const messageTextarea = document.getElementById('emailMessage');
+        const subjectInput = document.getElementById('emailSubject');
+
+        // Set default message
+        messageTextarea.value = `Dear Department Head,
+
+This is to inform you that the probation period for ${name} (ID: ${id}), ${designation} in the ${dept} department, is ending soon on ${endDate}.
+
+Please review the employee's performance and take necessary action regarding their confirmation.
+
+Thank you for your attention to this matter.
+
+Best regards,
+HR Department`;
+
+        // Show modal
+        document.getElementById('emailModal').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('emailModalContent').classList.remove('scale-95', 'opacity-0');
+            document.getElementById('emailModalContent').classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closeEmailModal() {
+        const modal = document.getElementById('emailModalContent');
+        modal.classList.remove('scale-100', 'opacity-0');
+        modal.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            document.getElementById('emailModal').classList.add('hidden');
+        }, 200);
+    }
+
+    async function sendEmailNotification() {
+        const recipientEmail = document.getElementById('recipientEmail').value;
+        const subject = document.getElementById('emailSubject').value;
+        const message = document.getElementById('emailMessage').value;
+        const employeeId = document.getElementById('modalEmployeeName').value.split(' (ID: ')[1]?.replace(')', '');
+
+        if (!recipientEmail) {
+            showMessage('Please enter a recipient email address', 'error');
+            return;
+        }
+
+        if (!employeeId) {
+            showMessage('Error getting employee ID', 'error');
+            return;
+        }
+
+        // Disable button and show loading state
+        const sendButton = document.querySelector('#emailModal button[onclick="sendEmailNotification()"]');
+        const originalText = sendButton.innerHTML;
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+
+        try {
+            const formData = new FormData();
+            formData.append('employee_id', employeeId);
+            formData.append('recipient_email', recipientEmail);
+            formData.append('subject', subject);
+
+            // Only append message if it's not empty (otherwise use HTML template)
+            if (message.trim() !== '') {
+                formData.append('message', message);
+            }
+
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+            const response = await fetch('{% url "send_probation_email" %}', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                // Reset form
+                document.getElementById('recipientEmail').value = '';
+                document.getElementById('emailSubject').value = 'Probation Period Ending Soon - Action Required';
+                document.getElementById('emailMessage').value = '';
+
+                // Close modal
+                closeEmailModal();
+
+                // Show success message
+                showMessage('Email notification sent successfully!', 'success');
+            } else {
+                const data = await response.json();
+                showMessage(data.error || 'Failed to send email notification', 'error');
+            }
+        } catch (error) {
+            console.error('Error sending email:', error);
+            showMessage('Error sending email notification: ' + error.message, 'error');
+        } finally {
+            // Re-enable button and restore original text
+            sendButton.disabled = false;
+            sendButton.innerHTML = originalText;
+        }
+    }
+
+    function showMessage(message, type) {
+        // Create message element
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg text-white z-50 ${
+            type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`;
+        msgDiv.textContent = message;
+
+        document.body.appendChild(msgDiv);
+
+        // Remove message after 3 seconds
+        setTimeout(() => {
+            msgDiv.remove();
+        }, 3000);
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('emailModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeEmailModal();
+        }
+    });
+
+    // Handle template change
+    document.getElementById('messageTemplate').addEventListener('change', function() {
+        const selectedTemplate = this.value;
+        const messageTextarea = document.getElementById('emailMessage');
+        const employeeName = document.getElementById('modalEmployeeName').value;
+        const employeeDept = document.getElementById('modalEmployeeDept').value;
+
+        if (selectedTemplate === 'standard') {
+            messageTextarea.value = `Dear Department Head,
+
+This is to inform you that the probation period for ${employeeName.split(' (')[0]} in the ${employeeDept} department is ending soon.
+
+Please review the employee's performance and take necessary action regarding their confirmation.
+
+Thank you for your attention to this matter.
+
+Best regards,
+HR Department`;
+        } else if (selectedTemplate === 'urgent') {
+            messageTextarea.value = `URGENT ACTION REQUIRED
+
+Dear Department Head,
+
+The probation period for ${employeeName.split(' (')[0]} in the ${employeeDept} department is ending very soon. Immediate review and decision are required.
+
+Please prioritize this matter and confirm the employee's status as soon as possible.
+
+Best regards,
+HR Department`;
+        } else if (selectedTemplate === 'custom') {
+            messageTextarea.value = '';
+        }
+    });
+
+    // Function to handle employee approval via AJAX
+    function approveEmployee(employeeId, element, action = 'approve') {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Show loading state
+        const originalHTML = element.innerHTML;
+        element.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Processing...';
+        element.disabled = true;
+
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('comments', `Action performed via employee list: ${action}`);
+        if (action === 'extend') {
+            formData.append('extension_months', 3); // Default extension period
+        }
+        formData.append('csrfmiddlewaretoken', csrfToken);
+
+        // Send AJAX request
+        fetch(`/employees/${employeeId}/probation-approval-ajax/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update the status badge
+                const statusCell = element.closest('tr').querySelector('.probation-status-cell');
+                if (statusCell) {
+                    let statusClass = '';
+                    let statusIcon = '';
+                    let statusText = '';
+
+                    if (data.action === 'extend') {
+                        statusClass = 'bg-yellow-100 text-yellow-800';
+                        statusIcon = 'fa-history';
+                        statusText = 'Extended';
+                    } else if (data.action === 'approve') {
+                        statusClass = 'bg-blue-100 text-blue-800';
+                        statusIcon = 'fa-check-circle';
+                        statusText = 'Completed';
+                    } else {
+                        statusClass = 'bg-red-100 text-red-800';
+                        statusIcon = 'fa-times-circle';
+                        statusText = 'Rejected';
+                    }
+
+                    statusCell.innerHTML = `
+                        <span class="px-3 py-1.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                            <i class="fas ${statusIcon} mr-1"></i>${statusText}
+                        </span>
+                    `;
+                }
+
+                // Update the row's status attribute
+                element.closest('tr').setAttribute('data-status', data.action);
+
+                // For approve/reject actions, remove from list; for extend, just update
+                if (data.action === 'approve' || data.action === 'reject') {
+                    // Remove the row from the table after a short delay
+                    setTimeout(function() {
+                        element.closest('tr').style.transition = 'opacity 0.5s ease-out';
+                        element.closest('tr').style.opacity = '0';
+
+                        setTimeout(function() {
+                            element.closest('tr').remove();
+
+                            // Update the counts in the filter buttons
+                            const allCount = document.querySelectorAll('.employee-row').length;
+                            const activeRows = document.querySelectorAll('.employee-row[data-status*="active"]').length;
+                            const endingSoonRows = document.querySelectorAll('.employee-row[data-status*="ending"], .employee-row[data-status*="soon"]').length;
+                            const completedRows = document.querySelectorAll('.employee-row[data-status*="complet"]').length;
+
+                            document.querySelector('[data-filter="all"] span').textContent = allCount;
+                            document.querySelector('[data-filter="active"] span').textContent = activeRows;
+                            document.querySelector('[data-filter="ending-soon"] span').textContent = endingSoonRows;
+                            document.querySelector('[data-filter="completed"] span').textContent = completedRows;
+                        }, 500);
+                    }, 1000);
+
+                    showMessage(data.message, 'success');
+                } else if (data.action === 'extend') {
+                    // For extension, update the end date and days remaining
+                    setTimeout(function() {
+                        // Update end date
+                        const endDateCell = element.closest('tr').querySelector('td:nth-child(6)');
+                        if (endDateCell && data.extended_end_date) {
+                            endDateCell.textContent = data.extended_end_date;
+                        }
+
+                        // Update days remaining
+                        const daysRemainingCell = element.closest('tr').querySelector('td:nth-child(8)');
+                        if (daysRemainingCell && data.extended_end_date) {
+                            const newEndDate = new Date(data.extended_end_date);
+                            const today = new Date();
+                            const timeDiff = newEndDate.getTime() - today.getTime();
+                            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                            daysRemainingCell.innerHTML = `
+                                ${daysDiff}
+                                ${daysDiff <= 1 ? \`<div class="mt-1"><span class="inline-flex items-center text-xs text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i> Expires today</span></div>\` :
+                                  daysDiff <= 15 ? \`<div class="mt-1"><span class="inline-flex items-center text-xs text-orange-500"><i class="fas fa-clock mr-1"></i> Expires soon</span></div>\` :
+                                  \`<div class="mt-1"><span class="inline-flex items-center text-xs text-green-600"><i class="fas fa-check-circle mr-1"></i> More than 15 days</span></div>\`}
+                            `;
+                        }
+                    }, 500);
+
+                    // Update the action button to show completion
+                    element.outerHTML = \`<span class="text-green-600 bg-green-50 px-3 py-1.5 rounded-md text-sm flex items-center">
+                        <i class="fas fa-check-circle mr-1"></i>Completed
+                    </span>\`;
+
+                    showMessage(data.message, 'success');
+                }
+            } else {
+                showMessage(data.error || 'Error processing employee', 'error');
+                element.innerHTML = originalHTML;
+                element.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('Error processing employee', 'error');
+            element.innerHTML = originalHTML;
+            element.disabled = false;
+        });
+    }
+
+    // Add event listeners to approve buttons
+    document.querySelectorAll('.approve-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const employeeId = this.getAttribute('data-employee-id');
+            const action = this.getAttribute('data-action') || 'approve';
+
+            let confirmationMessage = 'Are you sure you want to approve this employee?';
+            if (action === 'extend') {
+                confirmationMessage = 'This employee\'s probation has been extended. Are you sure you want to update their status?';
+            }
+
+            if (confirm(confirmationMessage)) {
+                approveEmployee(employeeId, this, action);
+            }
+        });
+    });
+
+</script>
+{% endblock %}
+    {% csrf_token %}
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95 opacity-0" id="emailModalContent">
+        <div class="p-6">
+            <div class="flex justify-between items-center border-b pb-4">
+                <h3 class="text-lg font-bold text-gray-900">Send Probation Notification</h3>
+                <button onclick="closeEmailModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mt-4" id="emailModalBody">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                    <input type="text" id="modalEmployeeName" class="w-full px-3 py-2 border border-gray-300 rounded-md" readonly>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                    <input type="text" id="modalEmployeeDept" class="w-full px-3 py-2 border border-gray-300 rounded-md" readonly>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
+                    <input type="email" id="recipientEmail" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="Enter department head email">
+                    <p class="mt-1 text-xs text-gray-500">Enter the email of the department head or concerned authority</p>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input type="text" id="emailSubject" class="w-full px-3 py-2 border border-gray-300 rounded-md" value="Probation Period Ending Soon - Action Required">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Message Template</label>
+                    <select id="messageTemplate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        <option value="standard">Standard Probation Notification</option>
+                        <option value="urgent">Urgent Review Required</option>
+                        <option value="custom">Custom Message</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <textarea id="emailMessage" class="w-full px-3 py-2 border border-gray-300 rounded-md h-32" placeholder="Enter your message here..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t">
+                <button onclick="closeEmailModal()" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition">
+                    Cancel
+                </button>
+                <button onclick="sendEmailNotification()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-md hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-md">
+                    Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openEmailModal(name, id, dept, designation, endDate) {
+        document.getElementById('modalEmployeeName').value = `${name} (ID: ${id})`;
+        document.getElementById('modalEmployeeDept').value = dept;
+
+        // Pre-fill message based on template selection
+        const templateSelect = document.getElementById('messageTemplate');
+        const messageTextarea = document.getElementById('emailMessage');
+        const subjectInput = document.getElementById('emailSubject');
+
+        // Set default message
+        messageTextarea.value = `Dear Department Head,\n\nThis is to inform you that the probation period for ${name} (ID: ${id}), ${designation} in the ${dept} department, is ending soon on ${endDate}.\n\nPlease review the employee's performance and take necessary action regarding their confirmation.\n\nThank you for your attention to this matter.\n\nBest regards,\nHR Department`;
+
+        // Show modal
+        document.getElementById('emailModal').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('emailModalContent').classList.remove('scale-95', 'opacity-0');
+            document.getElementById('emailModalContent').classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closeEmailModal() {
+        const modal = document.getElementById('emailModalContent');
+        modal.classList.remove('scale-100', 'opacity-100');
+        modal.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            document.getElementById('emailModal').classList.add('hidden');
+        }, 200);
+    }
+
+    async function sendEmailNotification() {
+        const recipientEmail = document.getElementById('recipientEmail').value;
+        const subject = document.getElementById('emailSubject').value;
+        const message = document.getElementById('emailMessage').value;
+        const employeeId = document.getElementById('modalEmployeeName').value.split(' (ID: ')[1]?.replace(')', '');
+
+        if (!recipientEmail) {
+            showMessage('Please enter a recipient email address', 'error');
+            return;
+        }
+
+        if (!employeeId) {
+            showMessage('Error getting employee ID', 'error');
+            return;
+        }
+
+        // Disable button and show loading state
+        const sendButton = document.querySelector('#emailModal button[onclick="sendEmailNotification()"]');
+        const originalText = sendButton.innerHTML;
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+
+        try {
+            const formData = new FormData();
+            formData.append('employee_id', employeeId);
+            formData.append('recipient_email', recipientEmail);
+            formData.append('subject', subject);
+
+            // Only append message if it's not empty (otherwise use HTML template)
+            if (message.trim() !== '') {
+                formData.append('message', message);
+            }
+
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+            const response = await fetch('{% url "send_probation_email" %}', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                // Reset form
+                document.getElementById('recipientEmail').value = '';
+                document.getElementById('emailSubject').value = 'Probation Period Ending Soon - Action Required';
+                document.getElementById('emailMessage').value = '';
+
+                // Close modal
+                closeEmailModal();
+
+                // Show success message
+                showMessage(data.message || 'Email notification sent successfully!', 'success');
+            } else {
+                showMessage(data.error || 'Failed to send email notification', 'error');
+            }
+        } catch (error) {
+            console.error('Error sending email:', error);
+            showMessage('Error sending email notification: ' + error.message, 'error');
+        } finally {
+            // Re-enable button and restore original text
+            sendButton.disabled = false;
+            sendButton.innerHTML = originalText;
+        }
+    }
+
+    function showMessage(message, type) {
+        // Create message element
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg text-white z-50 ${
+            type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`;
+        msgDiv.textContent = message;
+
+        document.body.appendChild(msgDiv);
+
+        // Remove message after 3 seconds
+        setTimeout(() => {
+            msgDiv.remove();
+        }, 3000);
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('emailModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeEmailModal();
+        }
+    });
+
+    // Handle template change
+    document.getElementById('messageTemplate').addEventListener('change', function() {
+        const selectedTemplate = this.value;
+        const messageTextarea = document.getElementById('emailMessage');
+        const employeeName = document.getElementById('modalEmployeeName').value;
+        const employeeDept = document.getElementById('modalEmployeeDept').value;
+
+        if (selectedTemplate === 'standard') {
+            messageTextarea.value = `Dear Department Head,\n\nThis is to inform you that the probation period for ${employeeName.split(' (')[0]} in the ${employeeDept} department is ending soon.\n\nPlease review the employee's performance and take necessary action regarding their confirmation.\n\nThank you for your attention to this matter.\n\nBest regards,\nHR Department`;
+        } else if (selectedTemplate === 'urgent') {
+            messageTextarea.value = `URGENT ACTION REQUIRED\n\nDear Department Head,\n\nThe probation period for ${employeeName.split(' (')[0]} in the ${employeeDept} department is ending very soon. Immediate review and decision are required.\n\nPlease prioritize this matter and confirm the employee's status as soon as possible.\n\nBest regards,\nHR Department`;
+        } else if (selectedTemplate === 'custom') {
+            messageTextarea.value = '';
+        }
+    });
+
+    // Function to handle employee approval via AJAX
+    function approveEmployee(employeeId, element) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Show loading state
+        const originalHTML = element.innerHTML;
+        element.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Processing...';
+        element.disabled = true;
+
+        // Send AJAX request
+        fetch(`/employees/${employeeId}/probation-approval-ajax/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            body: new FormData(),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update the status badge
+                const statusCell = element.closest('tr').querySelector('.probation-status-badge');
+                if (statusCell) {
+                    statusCell.innerHTML = `
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Completed
+                        </span>
+                    `;
+                }
+
+                // Remove the row from the table after a short delay
+                setTimeout(function() {
+                    element.closest('tr').remove();
+
+                    // Update the employee count
+                    const countElement = document.querySelector('.text-sm.text-gray-600');
+                    if (countElement) {
+                        const currentCount = parseInt(countElement.textContent.match(/\d+/)[0]);
+                        countElement.textContent = `Showing ${currentCount - 1} employees`;
+                    }
+                }, 1000);
+
+                showMessage(data.message, 'success');
+            } else {
+                showMessage(data.error || 'Error approving employee', 'error');
+                element.innerHTML = originalHTML;
+                element.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('Error approving employee', 'error');
+            element.innerHTML = originalHTML;
+            element.disabled = false;
+        });
+    }
+
+    // Add event listeners to approve buttons
+    document.querySelectorAll('.approve-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const employeeId = this.getAttribute('data-employee-id');
+            const action = this.getAttribute('data-action') || 'approve';
+
+            let confirmationMessage = 'Are you sure you want to approve this employee?';
+            if (action === 'extend') {
+                confirmationMessage = 'This employee\'s probation has been extended. Are you sure you want to update their status?';
+            }
+
+            if (confirm(confirmationMessage)) {
+                approveEmployee(employeeId, this, action);
+            }
+        });
+    });
+
+    // Function to handle employee approval/extension via AJAX
+    function approveEmployee(employeeId, element, action = 'approve') {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Show loading state
+        const originalHTML = element.innerHTML;
+        element.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Processing...';
+        element.disabled = true;
+
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('comments', `Action performed via employee list: ${action}`);
+        if (action === 'extend') {
+            formData.append('extension_months', 3); // Default extension period
+        }
+        formData.append('csrfmiddlewaretoken', csrfToken);
+
+        // Send AJAX request
+        fetch(`/employees/${employeeId}/probation-approval-ajax/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update the status badge
+                const statusCell = element.closest('tr').querySelector('.probation-status-badge');
+                if (statusCell) {
+                    let statusClass = '';
+                    let statusText = '';
+
+                    if (data.action === 'extend') {
+                        statusClass = 'bg-yellow-100 text-yellow-800';
+                        statusText = 'Extended';
+                    } else if (data.action === 'approve') {
+                        statusClass = 'bg-blue-100 text-blue-800';
+                        statusText = 'Completed';
+                    } else {
+                        statusClass = 'bg-red-100 text-red-800';
+                        statusText = 'Rejected';
+                    }
+
+                    statusCell.innerHTML = `
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                            ${statusText}
+                        </span>
+                    `;
+                }
+
+                // For approve/reject actions, remove the row; for extend, just update
+                if (data.action === 'approve' || data.action === 'reject') {
+                    // Remove the row from the table after a short delay
+                    setTimeout(function() {
+                        element.closest('tr').remove();
+
+                        // Update the employee count
+                        const countElement = document.querySelector('.text-sm.text-gray-600');
+                        if (countElement) {
+                            const currentCount = parseInt(countElement.textContent.match(/\d+/)[0]);
+                            countElement.textContent = `Showing ${currentCount - 1} employees`;
+                        }
+                    }, 1000);
+                } else if (data.action === 'extend') {
+                    // For extension, update the end date and days remaining
+                    setTimeout(function() {
+                        // Update end date
+                        const endDateCell = element.closest('tr').querySelector('td:nth-child(6)');
+                        if (endDateCell && data.extended_end_date) {
+                            endDateCell.textContent = data.extended_end_date;
+                        }
+
+                        // Update days remaining
+                        const daysRemainingCell = element.closest('tr').querySelector('td:nth-child(8)');
+                        if (daysRemainingCell && data.extended_end_date) {
+                            const newEndDate = new Date(data.extended_end_date);
+                            const today = new Date();
+                            const timeDiff = newEndDate.getTime() - today.getTime();
+                            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                            daysRemainingCell.innerHTML = `
+                                ${daysDiff}
+                                ${daysDiff <= 15 ? `<div class="mt-1"><span class="inline-flex items-center text-xs text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i> Expires soon</span></div>` : ''}
+                            `;
+                        }
+                    }, 500);
+                }
+
+                showMessage(data.message, 'success');
+            } else {
+                showMessage(data.error || 'Error processing employee', 'error');
+                element.innerHTML = originalHTML;
+                element.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('Error processing employee', 'error');
+            element.innerHTML = originalHTML;
+            element.disabled = false;
+        });
+    }
+</script>
+{% endblock %}

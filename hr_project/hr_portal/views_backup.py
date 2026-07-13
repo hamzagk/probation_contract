@@ -1,0 +1,1928 @@
+import pandas as pd
+import io
+from django.http import HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from collections import Counter
+from datetime import date
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+import openai
+from dateutil.relativedelta import relativedelta
+from .models import Employee, EmployeeDocument, ProbationNotification, DocumentTemplate, GeneratedDocument, ProbationApproval
+from .forms import EmployeeUploadForm
+
+def dashboard(request):
+    # Calculate stats
+    total_employees = Employee.objects.count()
+    active_probation = Employee.objects.filter(probation_status='Active').count()
+    ending_soon = Employee.objects.filter(probation_status='Ending Soon').count()
+    extended_probation = Employee.objects.filter(is_extended=True).count()
+    total_documents = EmployeeDocument.objects.count()
+
+    # Get upcoming probation expirations (within 30 days)
+    future_date = date.today() + timedelta(days=30)
+    upcoming_expirations = Employee.objects.filter(
+        end_date__range=[date.today(), future_date],
+        probation_status__in=['Active', 'Ending Soon']  # Exclude completed probation employees
+    ).order_by('end_date')[:10]
+
+    # Department distribution
+    departments = []
+    for emp in Employee.objects.all():
+        if emp.department:  # Check if department is not None
+            departments.append(emp.department.name)  # Use department name instead of object
+        else:
+            departments.append("Unassigned")  # Handle employees without departments
+
+    department_counter = Counter(departments)
+    departments_list = list(department_counter.keys())
+    department_counts_list = list(department_counter.values())
+
+    # Probation status distribution
+    probation_statuses = [emp.probation_status for emp in Employee.objects.all()]
+    probation_counter = Counter(probation_statuses)
+    status_counts = [
+        probation_counter.get('Active', 0),
+        probation_counter.get('Ending Soon', 0),
+        probation_counter.get('Completed', 0),
+        extended_probation  # Count of extended probation employees
+    ]
+
+    # Recent activities (mock data - you can customize this)
+    recent_activities = [
+        {'description': 'Added 5 new employees', 'timestamp': '2 hours ago'},
+        {'description': 'Updated probation status for 2 employees', 'timestamp': '5 hours ago'},
+        {'description': 'Generated monthly report', 'timestamp': 'Yesterday'},
+        {'description': 'Uploaded new policy documents', 'timestamp': '2 days ago'},
+    ]
+
+    context = {
+        'total_employees': total_employees,
+        'active_probation': active_probation,
+        'ending_soon': ending_soon,
+        'extended_probation': extended_probation,
+        'total_documents': total_documents,
+        'upcoming_expirations': upcoming_expirations,
+        'departments': departments_list,
+        'department_counts': department_counts_list,
+        'probation_status_counts': status_counts,
+        'recent_activities': recent_activities,
+    }
+
+    return render(request, 'hr_portal/dashboard.html', context)
+
+def employee_list(request):
+    employees = Employee.objects.all().order_by('employee_id')
+    templates = DocumentTemplate.objects.all()  # For document generation dropdown
+
+    # Update probation status for all employees to ensure they're current
+    for employee in employees:
+        # This will trigger the save method which updates the probation status
+        employee.save()
+
+    # Refresh the queryset after updating statuses
+    employees = Employee.objects.all().order_by('employee_id')
+
+    # Calculate counts for different statuses
+    active_count = employees.filter(probation_status='Active').count()
+    ending_soon_count = employees.filter(probation_status='Ending Soon').count()
+    completed_count = employees.filter(probation_status='Completed').count()
+
+    return render(request, 'hr_portal/enhanced_employee_list.html', {
+        'employees': employees,
+        'templates': templates,
+        'active_count': active_count,
+        'ending_soon_count': ending_soon_count,
+        'completed_count': completed_count
+    })
+
+def import_employees_from_excel(request):
+    if request.method == 'POST':
+        form = EmployeeUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            excel_file = request.FILES['excel_file']
+
+            try:
+                # Read the Excel file
+                df = pd.read_excel(excel_file)
+
+                # Validate required columns
+                required_columns = ['S.#', 'Name', 'Designation', 'Department', 'Start Date']
+                if not all(col in df.columns for col in required_columns):
+                    messages.error(request, f'Excel file must contain these columns: {", ".join(required_columns)}')
+                    return redirect('import_employees')
+
+                created_count = 0
+                updated_count = 0
+
+                for index, row in df.iterrows():
+                    employee_id = str(row['S.#']).strip()
+                    name = str(row['Name']).strip()
+                    designation = str(row['Designation']).strip()
+                    department = str(row['Department']).strip()
+                    start_date = pd.to_datetime(row['Start Date']).date()
+
+                    # Check if employee already exists
+                    employee, created = Employee.objects.get_or_create(
+                        employee_id=employee_id,
+                        defaults={
+                            'name': name,
+                            'designation': designation,
+                            'department': department,
+                            'start_date': start_date,
+                        }
+                    )
+
+                    if not created:
+                        # Update existing employee
+                        employee.name = name
+                        employee.designation = designation
+                        employee.department = department
+                        employee.start_date = start_date
+                        employee.save()
+                        updated_count += 1
+                    else:
+                        created_count += 1
+
+                messages.success(request, f'Successfully imported {created_count} new employees and updated {updated_count} existing employees.')
+                return redirect('employee_list')
+
+            except Exception as e:
+                messages.error(request, f'Error processing Excel file: {str(e)}')
+                return redirect('import_employees')
+    else:
+        form = EmployeeUploadForm()
+
+    return render(request, 'hr_portal/import_employees.html', {'form': form})
+
+def export_employees_to_excel(request):
+    # Get all employees
+    employees = Employee.objects.all().order_by('employee_id')
+
+    # Create a workbook and add a worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Employees"
+
+    # Define headers
+    headers = ['S.#', 'Name', 'Designation', 'Department', 'Start Date', 'End Date', 'Days Until Probation Ends', 'Probation Status']
+
+    # Style for header row
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    center_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add headers to the worksheet
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_alignment
+
+    # Add data rows
+    for row_num, employee in enumerate(employees, 2):
+        ws.cell(row=row_num, column=1, value=employee.employee_id)
+        ws.cell(row=row_num, column=2, value=employee.name)
+        ws.cell(row=row_num, column=3, value=employee.designation)
+        ws.cell(row=row_num, column=4, value=employee.department)
+        ws.cell(row=row_num, column=5, value=employee.start_date.strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=6, value=employee.end_date.strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=7, value=employee.days_until_probation_end)
+        ws.cell(row=row_num, column=8, value=employee.probation_status)
+
+    # Auto-adjust column widths
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    # Create response
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=employees_export.xlsx'
+
+    # Save workbook to response
+    wb.save(response)
+
+    return response
+
+def document_management(request):
+    if request.method == 'POST':
+        employee_id = request.POST.get('employee_id')
+        title = request.POST.get('title')
+        description = request.POST.get('description')
+        document_type = request.POST.get('document_type')
+        file = request.FILES.get('file')
+
+        if not all([employee_id, title, document_type, file]):
+            messages.error(request, 'Please fill all required fields and select a file.')
+            return redirect('document_management')
+
+        try:
+            # Get employee
+            employee = Employee.objects.get(employee_id=employee_id)
+
+            # Create document record
+            document = EmployeeDocument.objects.create(
+                employee=employee,
+                title=title,
+                description=description,
+                document_type=document_type,
+                file=file
+            )
+
+            messages.success(request, f'Document "{title}" uploaded successfully for {employee.name}.')
+            return redirect('document_management')
+
+        except Employee.DoesNotExist:
+            messages.error(request, 'Employee not found.')
+            return redirect('document_management')
+        except Exception as e:
+            messages.error(request, f'Error uploading document: {str(e)}')
+            return redirect('document_management')
+
+    # GET request - show all documents
+    documents = EmployeeDocument.objects.select_related('employee').all().order_by('-uploaded_at')
+    employees = Employee.objects.all().order_by('name')
+
+    context = {
+        'documents': documents,
+        'employees': employees
+    }
+
+    return render(request, 'hr_portal/document_management.html', context)
+
+@csrf_exempt
+def upload_document_ajax(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        employee_id = request.POST.get('employee_id')
+        title = request.POST.get('title')
+        description = request.POST.get('description')
+        document_type = request.POST.get('document_type')
+        file = request.FILES.get('file')
+
+        try:
+            employee = Employee.objects.get(employee_id=employee_id)
+
+            document = EmployeeDocument.objects.create(
+                employee=employee,
+                title=title,
+                description=description,
+                document_type=document_type,
+                file=file
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Document uploaded successfully',
+                'document_id': document.id,
+                'document_url': document.file.url
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+def download_document(request, document_id):
+    try:
+        document = EmployeeDocument.objects.get(id=document_id)
+        response = HttpResponse(document.file.read(), content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{document.file.name.split("/")[-1]}"'
+        return response
+    except EmployeeDocument.DoesNotExist:
+        messages.error(request, 'Document not found.')
+        return redirect('document_management')
+
+def ai_assistant(request):
+    return render(request, 'hr_portal/ai_assistant.html')
+
+@csrf_exempt
+def generate_document(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            document_type = data.get('document_type')
+            employee_data = data.get('employee_data', {})
+            additional_info = data.get('additional_info', '')
+
+            # Create a prompt based on the document type
+            prompt = create_document_prompt(document_type, employee_data, additional_info)
+
+            # Call OpenAI API to generate the document
+            openai.api_key = settings.OPENAI_API_KEY
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an HR assistant helping to generate professional HR documents. Generate well-formatted, professional documents appropriate for a university setting."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.7
+            )
+
+            generated_text = response.choices[0].message.content.strip()
+
+            return JsonResponse({
+                'success': True,
+                'document': generated_text
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+def create_document_prompt(document_type, employee_data, additional_info):
+    """Create a prompt for document generation based on type and employee data"""
+
+    employee_info = f"""
+    Employee Information:
+    - Name: {employee_data.get('name', 'N/A')}
+    - Employee ID: {employee_data.get('employee_id', 'N/A')}
+    - Designation: {employee_data.get('designation', 'N/A')}
+    - Department: {employee_data.get('department', 'N/A')}
+    - Start Date: {employee_data.get('start_date', 'N/A')}
+    """
+
+    if document_type == 'service_certificate':
+        return f"""
+        Generate a formal service certificate for the GIK Institute. Include:
+        {employee_info}
+
+        Format the certificate professionally with:
+        - GIK Institute letterhead reference
+        - Certificate title
+        - Formal recognition of service
+        - Specific dates of employment
+        - Appropriate closing
+        - Signature block
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'experience_certificate':
+        return f"""
+        Generate a formal experience certificate for the GIK Institute. Include:
+        {employee_info}
+
+        Format the certificate professionally with:
+        - GIK Institute letterhead reference
+        - Certificate title
+        - Confirmation of employment
+        - Job responsibilities summary
+        - Duration of service
+        - Professional closing
+        - Authorized signature
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'offer_letter':
+        return f"""
+        Generate a formal job offer letter for the GIK Institute. Include:
+        {employee_info}
+
+        Format the letter professionally with:
+        - GIK Institute letterhead
+        - Date
+        - Employee name and address
+        - Position title
+        - Reporting manager
+        - Start date
+        - Compensation details
+        - Terms and conditions
+        - Closing remarks
+        - Signature block
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'appointment_letter':
+        return f"""
+        Generate a formal appointment letter for the GIK Institute. Include:
+        {employee_info}
+
+        Format the letter professionally with:
+        - GIK Institute letterhead
+        - Date
+        - Employee name
+        - Position title
+        - Department
+        - Start date
+        - Reporting structure
+        - Key responsibilities
+        - Terms of appointment
+        - Closing remarks
+        - Authorized signature
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'termination_letter':
+        return f"""
+        Generate a formal termination letter for the GIK Institute. Include:
+        {employee_info}
+
+        Format the letter professionally with:
+        - GIK Institute letterhead
+        - Date
+        - Employee name
+        - Termination effective date
+        - Reason for termination (if appropriate)
+        - Final settlement information
+        - Return of company property
+        - Closing remarks
+        - Authorized signature
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'probation_confirmation_letter':
+        return f"""
+        Generate a formal probation confirmation letter for the GIK Institute. Include:
+        {employee_info}
+
+        Format the letter professionally with:
+        - GIK Institute letterhead reference
+        - Reference number (e.g., GIKI/HRD/PF.####/####)
+        - Date
+        - Employee name and designation
+        - Department
+        - Subject: Probation Confirmation
+        - Body confirming successful completion of probation period
+        - Effective date of confirmation
+        - Confirmation that all terms and conditions remain the same
+        - Closing remarks
+        - Authorization signature block
+        - CC to relevant departments/personal file
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'probation_extension_letter':
+        return f"""
+        Generate a formal probation extension letter for the GIK Institute. Include:
+        {employee_info}
+
+        Format the letter professionally with:
+        - GIK Institute letterhead reference
+        - Reference number (e.g., GIKI/HRD/PF.####/####)
+        - Date
+        - Employee name and designation
+        - Department
+        - Subject: Extension of Probation Period
+        - Body explaining the extension approval based on performance
+        - Duration of extension (months)
+        - New end date of probation period
+        - Opportunity to demonstrate skills
+        - Confirmation that other terms remain unchanged
+        - Closing remarks
+        - Authorization signature block
+        - CC to relevant departments/personal file
+
+        Additional Information: {additional_info}
+        """
+
+    elif document_type == 'transfer_letter':
+        return f"""
+        Generate a formal transfer letter for the GIK Institute. Include:
+        {employee_info}
+
+        Format the letter professionally with:
+        - GIK Institute letterhead
+        - Date
+        - Employee name
+        - Previous department/designation
+        - New department/designation
+        - Transfer effective date
+        - Reporting changes
+        - Acknowledgment requirements
+        - Closing remarks
+        - Authorized signature
+
+        Additional Information: {additional_info}
+        """
+
+    else:  # General letter/note
+        return f"""
+        Generate a professional document for the GIK Institute. Include:
+        {employee_info}
+
+        Type: {document_type.replace('_', ' ').title()}
+
+        Additional Information: {additional_info}
+
+        Format appropriately for a university setting with professional tone.
+        """
+
+def get_employees_api(request):
+    """API endpoint to get employee data for the AI assistant"""
+    employees = Employee.objects.all().values(
+        'employee_id', 'name', 'designation', 'department', 'start_date'
+    )
+    return JsonResponse(list(employees), safe=False)
+
+def employee_edit(request, employee_id):
+    """Edit employee details"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+
+    if request.method == 'POST':
+        employee.employee_id = request.POST.get('employee_id')
+        employee.name = request.POST.get('name')
+        employee.designation = request.POST.get('designation')
+        employee.department = request.POST.get('department')
+
+        # Convert the start_date string to a date object
+        from datetime import datetime
+        start_date_str = request.POST.get('start_date')
+        try:
+            start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            employee.start_date = start_date_obj
+        except ValueError:
+            messages.error(request, 'Invalid date format. Please use YYYY-MM-DD.')
+            return render(request, 'hr_portal/employee_edit.html', {'employee': employee})
+
+        try:
+            employee.save()
+            messages.success(request, f'Employee {employee.name} updated successfully.')
+            return redirect('employee_list')
+        except Exception as e:
+            messages.error(request, f'Error updating employee: {str(e)}')
+
+    return render(request, 'hr_portal/employee_edit.html', {'employee': employee})
+
+def employee_delete(request, employee_id):
+    """Delete employee"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+
+    if request.method == 'POST':
+        employee_name = employee.name
+        employee.delete()
+        messages.success(request, f'Employee {employee_name} deleted successfully.')
+        return redirect('employee_list')
+
+    return render(request, 'hr_portal/employee_delete.html', {'employee': employee})
+
+def template_management(request):
+    """Manage document templates"""
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        template_type = request.POST.get('template_type')
+        description = request.POST.get('description')
+        template_file = request.FILES.get('template_file')
+
+        if name and template_type and template_file:
+            template = DocumentTemplate.objects.create(
+                name=name,
+                template_type=template_type,
+                description=description,
+                template_file=template_file
+            )
+            messages.success(request, f'Template "{name}" added successfully.')
+            return redirect('template_management')
+        else:
+            messages.error(request, 'Please fill all required fields and select a template file.')
+
+    templates = DocumentTemplate.objects.all()
+    return render(request, 'hr_portal/template_management.html', {'templates': templates})
+
+def template_edit(request, template_id):
+    """Edit document template"""
+    template = get_object_or_404(DocumentTemplate, id=template_id)
+
+    if request.method == 'POST':
+        template.name = request.POST.get('name')
+        template.template_type = request.POST.get('template_type')
+        template.description = request.POST.get('description')
+
+        if request.FILES.get('template_file'):
+            template.template_file = request.FILES.get('template_file')
+
+        template.save()
+        messages.success(request, f'Template "{template.name}" updated successfully.')
+        return redirect('template_management')
+
+    return render(request, 'hr_portal/template_edit.html', {'template': template})
+
+def template_delete(request, template_id):
+    """Delete document template"""
+    template = get_object_or_404(DocumentTemplate, id=template_id)
+
+    if request.method == 'POST':
+        template_name = template.name
+        template.delete()
+        messages.success(request, f'Template "{template_name}" deleted successfully.')
+        return redirect('template_management')
+
+    return render(request, 'hr_portal/template_delete.html', {'template': template})
+
+
+def template_content_edit(request, template_id):
+    """Edit the content of a document template"""
+    template = get_object_or_404(DocumentTemplate, id=template_id)
+
+    if request.method == 'POST':
+        content = request.POST.get('content', '')
+
+        try:
+            # Update the template file content
+            import os
+            from django.conf import settings
+
+            # Get the template file path
+            template_path = os.path.join(settings.MEDIA_ROOT, template.template_file.name)
+
+            # Write the new content to the file
+            with open(template_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            messages.success(request, f'Template content for "{template.name}" updated successfully.')
+            return redirect('template_management')
+
+        except Exception as e:
+            messages.error(request, f'Error updating template content: {str(e)}')
+
+    # For GET request, read the current template content
+    try:
+        import os
+        from django.conf import settings
+
+        # Get the template file path
+        template_path = os.path.join(settings.MEDIA_ROOT, template.template_file.name)
+
+        # Read the current content of the template file
+        with open(template_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+    except Exception as e:
+        messages.error(request, f'Error reading template content: {str(e)}')
+        content = ''
+
+    return render(request, 'hr_portal/template_content_edit.html', {
+        'template': template,
+        'content': content
+    })
+
+def generate_document_from_template(request, employee_id, template_id):
+    """Generate a document for an employee using a template and return as downloadable file"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+    template = get_object_or_404(DocumentTemplate, id=template_id)
+
+    try:
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+        from docxtpl import DocxTemplate
+        import tempfile
+
+        # Prepare context for template
+        context = {
+            'employee_name': employee.name,
+            'employee_id': employee.employee_id,
+            'designation': employee.designation,
+            'department': employee.department,
+            'start_date': employee.start_date.strftime('%B %d, %Y'),
+            'end_date': employee.end_date.strftime('%B %d, %Y'),
+            'current_date': date.today().strftime('%B %d, %Y'),
+            'current_date_short': date.today().strftime('%Y-%m-%d'),
+            'probation_status': employee.probation_status,
+            'days_until_probation_end': employee.days_until_probation_end
+        }
+
+        # If the template is a .docx file, process it with docxtpl
+        if template.template_file.name.endswith('.docx'):
+            # Load the template
+            template_path = os.path.join(settings.MEDIA_ROOT, template.template_file.name)
+            doc = DocxTemplate(template_path)
+
+            # Render the template with context
+            doc.render(context)
+
+            # Create a BytesIO buffer to hold the document
+            from io import BytesIO
+            buffer = BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
+
+            # Create GeneratedDocument record
+            filename = f"{template.name}_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.docx"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            # Save the document to the file system as well
+            with open(filepath, 'wb') as f:
+                f.write(buffer.getvalue())
+
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=template,
+                title=f"{template.name} for {employee.name}",
+                description=f"Generated {template.get_template_type_display()} for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            # Return the document as a downloadable response
+            response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        else:
+            # For other file types, create a simple text document with employee details
+            doc_content = f"""GIK Institute
+Employee Document
+
+Employee Name: {employee.name}
+Employee ID: {employee.employee_id}
+Designation: {employee.designation}
+Department: {employee.department}
+Start Date: {employee.start_date}
+End Date: {employee.end_date}
+Current Date: {date.today().strftime('%Y-%m-%d')}
+
+Document Type: {template.get_template_type_display()}
+
+Generated on: {date.today().strftime('%B %d, %Y')}
+            """
+
+            # Create GeneratedDocument record
+            filename = f"{template.name}_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(doc_content)
+
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=template,
+                title=f"{template.name} for {employee.name}",
+                description=f"Generated {template.get_template_type_display()} for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            # Return the document as a downloadable response
+            response = HttpResponse(doc_content, content_type='text/plain')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+    except ImportError:
+        # If docxtpl is not available, create a simple text document
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+
+        # Create a simple text document with employee details
+        doc_content = f"""GIK Institute
+Employee Document
+
+Employee Name: {employee.name}
+Employee ID: {employee.employee_id}
+Designation: {employee.designation}
+Department: {employee.department}
+Start Date: {employee.start_date}
+End Date: {employee.end_date}
+Current Date: {date.today().strftime('%Y-%m-%d')}
+
+Document Type: {template.get_template_type_display()}
+
+Generated on: {date.today().strftime('%B %d, %Y')}
+        """
+
+        # Create GeneratedDocument record
+        filename = f"{template.name}_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+        filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(doc_content)
+
+        generated_doc = GeneratedDocument.objects.create(
+            employee=employee,
+            template=template,
+            title=f"{template.name} for {employee.name}",
+            description=f"Generated {template.get_template_type_display()} for {employee.name}",
+            document_file=f"employees/{employee.employee_id}/{filename}"
+        )
+
+        # Return the document as a downloadable response
+        response = HttpResponse(doc_content, content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    except Exception as e:
+        messages.error(request, f'Error generating document: {str(e)}')
+        return redirect('employee_list')
+
+def probation_approval(request, employee_id):
+    """Handle probation approval process"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+    approval, created = ProbationApproval.objects.get_or_create(
+        employee=employee,
+        defaults={
+            'requested_by': 'HR System',
+            'comments': f'Initial approval request for probation period ending on {employee.end_date}'
+        }
+    )
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        comments = request.POST.get('comments', '')
+        extension_months = int(request.POST.get('extension_months', 0))
+
+        if action == 'approve':
+            approval.approval_status = ProbationApproval.APPROVED
+            approval.comments = comments
+            approval.approved_by = request.user.username if request.user.is_authenticated else "System"
+            approval.approval_date = timezone.now()
+            approval.save()
+
+            # Update employee status
+            employee.probation_status = 'Completed'
+            employee.save()
+
+            # Generate probation completion letter
+            # Find the probation completion template
+            try:
+                completion_template = DocumentTemplate.objects.get(template_type='probation_letter')
+                # This would trigger document generation
+                messages.success(request, f'Probation approved for {employee.name}. Completion letter will be generated.')
+            except DocumentTemplate.DoesNotExist:
+                messages.warning(request, f'Probation approved for {employee.name}, but no completion letter template found.')
+
+        elif action == 'reject':
+            approval.approval_status = ProbationApproval.REJECTED
+            approval.comments = comments
+            approval.approved_by = request.user.username if request.user.is_authenticated else "System"
+            approval.approval_date = timezone.now()
+            approval.save()
+
+            messages.info(request, f'Probation rejected for {employee.name}. Next steps will be taken.')
+
+        elif action == 'extend':
+            approval.approval_status = ProbationApproval.EXTENDED
+            approval.comments = comments
+            approval.extension_months = extension_months
+            approval.approved_by = request.user.username if request.user.is_authenticated else "System"
+            approval.approval_date = timezone.now()
+
+            # Calculate new end date
+            from dateutil.relativedelta import relativedelta
+            new_end_date = employee.current_end_date + relativedelta(months=extension_months)
+            approval.extended_end_date = new_end_date
+            approval.save()
+
+            # Update employee to reflect extension
+            employee.is_extended = True
+            employee.extended_probation_end_date = new_end_date
+            employee.probation_status = 'Active'  # Reset to active since it's extended
+            employee.save()
+
+            messages.success(request, f'Probation extended for {employee.name} by {extension_months} months. New end date: {new_end_date.strftime("%Y-%m-%d")}.')
+        else:
+            messages.error(request, 'Invalid action')
+
+        # Check if it's an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'Probation {action} for {employee.name}',
+                'employee_id': employee.employee_id,
+                'probation_status': employee.probation_status
+            })
+
+        return redirect('employee_list')
+
+    return render(request, 'hr_portal/probation_approval.html', {
+        'employee': employee,
+        'approval': approval
+    })
+
+
+def probation_approval_ajax(request, employee_id):
+    """Handle probation approval via AJAX"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+    approval, created = ProbationApproval.objects.get_or_create(
+        employee=employee,
+        defaults={
+            'requested_by': 'HR System',
+            'comments': f'Initial approval request for probation period ending on {employee.end_date}'
+        }
+    )
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        comments = request.POST.get('comments', '')
+        extension_months = int(request.POST.get('extension_months', 0))
+
+        if action == 'approve':
+            approval.approval_status = ProbationApproval.APPROVED
+            approval.comments = comments
+            approval.approved_by = request.user.username if request.user.is_authenticated else "System"
+            approval.approval_date = timezone.now()
+            approval.save()
+
+            # Update employee status
+            employee.probation_status = 'Completed'
+            employee.save()
+
+            # Generate probation completion letter
+            # Find the probation completion template
+            try:
+                completion_template = DocumentTemplate.objects.get(template_type='probation_letter')
+                # This would trigger document generation
+            except DocumentTemplate.DoesNotExist:
+                pass
+
+            # Also update any related probation notifications
+            ProbationNotification.objects.filter(
+                employee=employee,
+                notification_type='probation_reminder'
+            ).update(sent=True)
+
+        elif action == 'reject':
+            approval.approval_status = ProbationApproval.REJECTED
+            approval.comments = comments
+            approval.approved_by = request.user.username if request.user.is_authenticated else "System"
+            approval.approval_date = timezone.now()
+            approval.save()
+
+        elif action == 'extend':
+            approval.approval_status = ProbationApproval.EXTENDED
+            approval.comments = comments
+            approval.extension_months = extension_months
+            approval.approved_by = request.user.username if request.user.is_authenticated else "System"
+            approval.approval_date = timezone.now()
+
+            # Calculate new end date
+            from dateutil.relativedelta import relativedelta
+            new_end_date = employee.current_end_date + relativedelta(months=extension_months)
+            approval.extended_end_date = new_end_date
+
+            approval.save()
+
+            # Update employee to reflect extension
+            employee.is_extended = True
+            employee.extended_probation_end_date = new_end_date
+            employee.probation_status = 'Active'  # Reset to active since it's extended
+            employee.save()
+
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid action'
+            })
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Probation {action} for {employee.name}',
+            'employee_id': employee.employee_id,
+            'probation_status': employee.probation_status,
+            'action': action,
+            'extended_end_date': employee.current_end_date.strftime('%Y-%m-%d') if employee.current_end_date else None
+        })
+
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    })
+
+def probation_noting(request, employee_id):
+    """Create probation noting after approval"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+
+    # Check if approval exists and is approved
+    try:
+        approval = ProbationApproval.objects.get(employee=employee, approval_status=ProbationApproval.APPROVED)
+    except ProbationApproval.DoesNotExist:
+        messages.error(request, f'No approved probation request found for {employee.name}. Please approve first.')
+        return redirect('employee_list')
+
+    # Generate the probation noting document
+    try:
+        # Find the probation noting template
+        noting_template = DocumentTemplate.objects.get(template_type='probation_note')
+
+        # Generate document using the template
+        context = {
+            'employee_name': employee.name,
+            'employee_id': employee.employee_id,
+            'designation': employee.designation,
+            'department': employee.department,
+            'start_date': employee.start_date.strftime('%B %d, %Y'),
+            'end_date': employee.end_date.strftime('%B %d, %Y'),
+            'current_date': date.today().strftime('%B %d, %Y'),
+            'current_date_short': date.today().strftime('%Y-%m-%d'),
+            'probation_status': employee.probation_status,
+            'days_until_probation_end': employee.days_until_probation_end,
+            'approver': approval.approved_by,
+            'approval_date': approval.approval_date.strftime('%B %d, %Y') if approval.approval_date else 'N/A'
+        }
+
+        import os
+        from django.conf import settings
+        from docxtpl import DocxTemplate
+
+        # If the template is a .docx file, process it with docxtpl
+        if noting_template.template_file.name.endswith('.docx'):
+            template_path = os.path.join(settings.MEDIA_ROOT, noting_template.template_file.name)
+            doc = DocxTemplate(template_path)
+            doc.render(context)
+
+            filename = f"Probation_Noting_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.docx"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            doc.save(filepath)
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=noting_template,
+                title=f"Probation Noting for {employee.name}",
+                description=f"Probation noting for {employee.name} after approval",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            messages.success(request, f'Probation noting created successfully for {employee.name}.')
+        else:
+            # Create a simple text document
+            doc_content = f"""GIK Institute
+Probation Noting
+
+Employee Name: {employee.name}
+Employee ID: {employee.employee_id}
+Designation: {employee.designation}
+Department: {employee.department}
+Start Date: {employee.start_date}
+End Date: {employee.end_date}
+Current Date: {date.today().strftime('%Y-%m-%d')}
+Approver: {approval.approved_by}
+Approval Date: {approval.approval_date.strftime('%Y-%m-%d') if approval.approval_date else 'N/A'}
+
+Status: Probation Completed Successfully
+Notes: {approval.comments}
+
+Generated on: {date.today().strftime('%B %d, %Y')}
+            """
+
+            filename = f"Probation_Noting_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(doc_content)
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=noting_template,
+                title=f"Probation Noting for {employee.name}",
+                description=f"Probation noting for {employee.name} after approval",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            messages.success(request, f'Probation noting created successfully for {employee.name}.')
+
+    except DocumentTemplate.DoesNotExist:
+        messages.error(request, 'No probation noting template found. Please add one first.')
+    except Exception as e:
+        messages.error(request, f'Error creating probation noting: {str(e)}')
+
+    return redirect('employee_list')
+
+def probation_letter(request, employee_id):
+    """Create probation completion letter after noting"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+
+    # Check if approval exists and is approved
+    try:
+        approval = ProbationApproval.objects.get(employee=employee, approval_status=ProbationApproval.APPROVED)
+    except ProbationApproval.DoesNotExist:
+        messages.error(request, f'No approved probation request found for {employee.name}. Please approve first.')
+        return redirect('employee_list')
+
+    # Generate the probation completion letter
+    try:
+        # Find the probation letter template
+        letter_template = DocumentTemplate.objects.get(template_type='probation_letter')
+
+        # Generate document using the template
+        context = {
+            'employee_name': employee.name,
+            'employee_id': employee.employee_id,
+            'designation': employee.designation,
+            'department': employee.department,
+            'start_date': employee.start_date.strftime('%B %d, %Y'),
+            'end_date': employee.end_date.strftime('%B %d, %Y'),
+            'current_date': date.today().strftime('%B %d, %Y'),
+            'current_date_short': date.today().strftime('%Y-%m-%d'),
+            'probation_status': employee.probation_status,
+            'days_until_probation_end': employee.days_until_probation_end,
+            'approver': approval.approved_by,
+            'approval_date': approval.approval_date.strftime('%B %d, %Y') if approval.approval_date else 'N/A'
+        }
+
+        import os
+        from django.conf import settings
+        from docxtpl import DocxTemplate
+
+        # If the template is a .docx file, process it with docxtpl
+        if letter_template.template_file.name.endswith('.docx'):
+            template_path = os.path.join(settings.MEDIA_ROOT, letter_template.template_file.name)
+            doc = DocxTemplate(template_path)
+            doc.render(context)
+
+            filename = f"Probation_Completion_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.docx"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            doc.save(filepath)
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=letter_template,
+                title=f"Probation Completion Letter for {employee.name}",
+                description=f"Probation completion letter for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            messages.success(request, f'Probation completion letter created successfully for {employee.name}.')
+        else:
+            # Create a simple text document
+            doc_content = f"""GIK Institute
+Probation Completion Letter
+
+To: {employee.name}
+Employee ID: {employee.employee_id}
+Designation: {employee.designation}
+Department: {employee.department}
+
+Subject: Successful Completion of Probation Period
+
+Dear {employee.name},
+
+We are pleased to inform you that you have successfully completed your probation period which started on {employee.start_date} and ended on {employee.end_date}.
+
+Your performance during the probation period has been satisfactory, and you are now confirmed in your position as {employee.designation} in the {employee.department} department.
+
+This letter serves as confirmation of your successful completion of the probation period.
+
+Congratulations!
+
+Date: {date.today().strftime('%B %d, %Y')}
+Approved by: {approval.approved_by}
+Approval Date: {approval.approval_date.strftime('%Y-%m-%d') if approval.approval_date else 'N/A'}
+
+GIK Institute
+HR Department
+            """
+
+            filename = f"Probation_Completion_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(doc_content)
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=letter_template,
+                title=f"Probation Completion Letter for {employee.name}",
+                description=f"Probation completion letter for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            messages.success(request, f'Probation completion letter created successfully for {employee.name}.')
+
+    except DocumentTemplate.DoesNotExist:
+        messages.error(request, 'No probation letter template found. Please add one first.')
+    except Exception as e:
+        messages.error(request, f'Error creating probation letter: {str(e)}')
+
+    return redirect('employee_list')
+
+def send_probation_notification_email(request):
+    """Send email notification for employees whose probation is expiring soon"""
+    if request.method == 'POST':
+        try:
+            # Get data from the request
+            employee_id = request.POST.get('employee_id')
+            recipient_email = request.POST.get('recipient_email')
+            subject = request.POST.get('subject')
+            message = request.POST.get('message')  # This could be custom message
+
+            # Validate inputs
+            if not all([employee_id, recipient_email, subject]):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'error': 'Please fill all required fields.'})
+                messages.error(request, 'Please fill all required fields.')
+                return redirect('employee_list')
+
+            # Get employee
+            employee = get_object_or_404(Employee, employee_id=employee_id)
+
+            # If no custom message provided, use the HTML template
+            if not message:
+                from django.template.loader import render_to_string
+                from django.core.mail import EmailMultiAlternatives
+
+                # Calculate probation progress percentage
+                total_probation_days = 180  # Assuming 6 months probation (approx.)
+                days_completed = total_probation_days - employee.days_until_probation_end
+                progress_percentage = int((days_completed / total_probation_days) * 100) if total_probation_days > 0 else 0
+
+                # Prepare context for the email template
+                context = {
+                    'employee_name': employee.name,
+                    'employee_id': employee.employee_id,
+                    'employee_designation': employee.designation,
+                    'employee_department': employee.department,
+                    'employee_start_date': employee.start_date.strftime('%B %d, %Y'),
+                    'employee_end_date': employee.end_date.strftime('%B %d, %Y'),
+                    'days_until_probation_end': employee.days_until_probation_end,
+                    'progress_percentage': progress_percentage,
+                }
+
+                # Render the HTML email template
+                html_message = render_to_string('hr_portal/enhanced_probation_notification_email.html', context)
+
+                # List of additional HR members to CC
+                hr_cc_emails = [
+                    'hikmatullah@giki.edu.pk',
+                    'nasirali@giki.edu.pk',
+                    'saboor@giki.edu.pk',
+                    'israr.hassan@giki.edu.pk',
+                    'shahid@giki.edu.pk'
+                ]
+
+                # Add the main HR contact to CC list
+                main_hr = getattr(settings, 'HR_EMAIL', 'muhammad.hamza@giki.edu.pk')
+                if main_hr not in hr_cc_emails:
+                    hr_cc_emails.insert(0, main_hr)
+
+                # Create the email with CC to HR
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=f"This is an HTML email notification about {employee.name}'s probation period. Please view it in a compatible email client.",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[recipient_email],
+                    cc=hr_cc_emails  # CC to main HR and additional HR members
+                )
+                email.attach_alternative(html_message, "text/html")
+                email.send()
+            else:
+                # Send plain text email if custom message is provided
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[recipient_email],
+                    fail_silently=False,
+                )
+
+            # Create a notification record
+            ProbationNotification.objects.create(
+                employee=employee,
+                days_before_expiry=employee.days_until_probation_end,
+                sent=True,
+                notification_type='email_sent'
+            )
+
+            success_message = f'Email notification sent successfully to {recipient_email} for {employee.name}.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': success_message})
+            messages.success(request, success_message)
+            return redirect('employee_list')
+
+        except Exception as e:
+            error_message = f'Error sending email notification: {str(e)}'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': error_message})
+            messages.error(request, error_message)
+            return redirect('employee_list')
+
+    # If not POST, redirect to employee list
+    return redirect('employee_list')
+
+
+def employee_create(request):
+    """Create a new employee"""
+    if request.method == 'POST':
+        employee_id = request.POST.get('employee_id')
+        name = request.POST.get('name')
+        designation = request.POST.get('designation')
+        department = request.POST.get('department')
+        start_date = request.POST.get('start_date')
+
+        # Validate required fields
+        if not all([employee_id, name, designation, department, start_date]):
+            messages.error(request, 'Please fill all required fields.')
+            return render(request, 'hr_portal/employee_create.html', {
+                'employee_id': employee_id,
+                'name': name,
+                'designation': designation,
+                'department': department,
+                'start_date': start_date,
+            })
+
+        try:
+            # Convert start_date to date object
+            from datetime import datetime
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+
+            # Create new employee
+            employee = Employee.objects.create(
+                employee_id=employee_id,
+                name=name,
+                designation=designation,
+                department=department,
+                start_date=start_date_obj
+            )
+
+            messages.success(request, f'Employee {name} created successfully.')
+            return redirect('employee_list')
+
+        except ValueError:
+            messages.error(request, 'Invalid date format. Please use YYYY-MM-DD.')
+            return render(request, 'hr_portal/employee_create.html', {
+                'employee_id': employee_id,
+                'name': name,
+                'designation': designation,
+                'department': department,
+                'start_date': start_date,
+            })
+        except Exception as e:
+            messages.error(request, f'Error creating employee: {str(e)}')
+            return render(request, 'hr_portal/employee_create.html', {
+                'employee_id': employee_id,
+                'name': name,
+                'designation': designation,
+                'department': department,
+                'start_date': start_date,
+            })
+
+    return render(request, 'hr_portal/employee_create.html')
+
+
+def generate_probation_confirmation_letter(request, employee_id):
+    """Generate a probation confirmation letter for an employee and return as downloadable file"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+
+    # Check if approval exists and is approved
+    try:
+        approval = ProbationApproval.objects.get(employee=employee, approval_status=ProbationApproval.APPROVED)
+    except ProbationApproval.DoesNotExist:
+        messages.error(request, f'No approved probation request found for {employee.name}. Please approve first.')
+        return redirect('employee_list')
+
+    # Generate the probation confirmation letter
+    try:
+        # Find the probation letter template
+        letter_template = DocumentTemplate.objects.get(template_type='probation_confirmation_letter')
+
+        # Generate document using the template
+        context = {
+            'employee_name': employee.name,
+            'employee_id': employee.employee_id,
+            'designation': employee.designation,
+            'department': employee.department.name if employee.department else employee.department,
+            'start_date': employee.start_date.strftime('%B %d, %Y'),
+            'end_date': employee.end_date.strftime('%B %d, %Y'),
+            'current_date': date.today().strftime('%B %d, %Y'),
+            'current_date_short': date.today().strftime('%Y-%m-%d'),
+            'probation_status': employee.probation_status,
+            'days_until_probation_end': employee.days_until_probation_end,
+            'approver': approval.approved_by,
+            'approval_date': approval.approval_date.strftime('%B %d, %Y') if approval.approval_date else 'N/A',
+            'confirmation_date': date.today().strftime('%B %d, %Y'),
+        }
+
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+        from docxtpl import DocxTemplate
+
+        # If the template is a .docx file, process it with docxtpl
+        if letter_template.template_file.name.endswith('.docx'):
+            template_path = os.path.join(settings.MEDIA_ROOT, letter_template.template_file.name)
+            doc = DocxTemplate(template_path)
+            doc.render(context)
+
+            # Create a BytesIO buffer to hold the document
+            from io import BytesIO
+            buffer = BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
+
+            filename = f"Probation_Confirmation_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.docx"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            # Save the document to the file system as well
+            with open(filepath, 'wb') as f:
+                f.write(buffer.getvalue())
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=letter_template,
+                title=f"Probation Confirmation Letter for {employee.name}",
+                description=f"Probation confirmation letter for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            # Return the document as a downloadable response
+            response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        else:
+            # Create a simple text document based on the template content
+            # Read the template file content
+            template_path = os.path.join(settings.MEDIA_ROOT, letter_template.template_file.name)
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template_content = f.read()
+
+            # Replace placeholders in the template
+            doc_content = template_content.replace('[EMPLOYEE_NAME]', employee.name)
+            doc_content = doc_content.replace('[DESIGNATION]', employee.designation)
+            doc_content = doc_content.replace('[DEPARTMENT]', employee.department.name if employee.department else str(employee.department))
+            doc_content = doc_content.replace('[START_DATE]', employee.start_date.strftime('%B %d, %Y'))
+            doc_content = doc_content.replace('[END_DATE]', employee.end_date.strftime('%B %d, %Y'))
+            doc_content = doc_content.replace('[CONFIRMATION_DATE]', date.today().strftime('%B %d, %Y'))
+            doc_content = doc_content.replace('[CURRENT_DATE]', date.today().strftime('%B %d, %Y'))
+
+            filename = f"Probation_Confirmation_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(doc_content)
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=letter_template,
+                title=f"Probation Confirmation Letter for {employee.name}",
+                description=f"Probation confirmation letter for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            # Return the document as a downloadable response
+            response = HttpResponse(doc_content, content_type='text/plain')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+    except DocumentTemplate.DoesNotExist:
+        # If no specific template exists, create a default probation confirmation letter
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+
+        # Create default content
+        doc_content = f"""No. GIKI/HRD/PF.2111/{date.today().year}
+
+
+                                                                {date.today().strftime('%B')}     , {date.today().year}
+
+
+Mr. {employee.name}
+{employee.designation}, {employee.department}
+GIK Institute, Topi Swabi
+
+
+Subject: Probation Confirmation
+
+Dear Sir,
+
+We are pleased to inform you that, on successful completion of your probation period, the management has decided to confirm your employment with effect from {employee.end_date.strftime('%B %d, %Y')}.
+All other terms and conditions of your employee contract shall remain the same.
+
+For and on behalf of GIK Institute
+
+
+
+Syed Israr Hassan
+Deputy Director (HR)
+
+
+Coy to:
+• Dean ({employee.department})
+• Personal File"""
+
+        filename = f"Probation_Confirmation_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+        filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(doc_content)
+
+        # Create GeneratedDocument record
+        generated_doc = GeneratedDocument.objects.create(
+            employee=employee,
+            template=None,  # No template used
+            title=f"Probation Confirmation Letter for {employee.name}",
+            description=f"Default probation confirmation letter for {employee.name}",
+            document_file=f"employees/{employee.employee_id}/{filename}"
+        )
+
+        # Return the document as a downloadable response
+        response = HttpResponse(doc_content, content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        messages.error(request, f'Error creating probation confirmation letter: {str(e)}')
+        return redirect('employee_list')
+
+
+def generate_probation_extension_letter(request, employee_id):
+    """Generate a probation extension letter for an employee and return as downloadable file"""
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+
+    # Check if approval exists and is extended
+    try:
+        approval = ProbationApproval.objects.get(employee=employee, approval_status=ProbationApproval.EXTENDED)
+    except ProbationApproval.DoesNotExist:
+        messages.error(request, f'No extended probation request found for {employee.name}. Please extend first.')
+        return redirect('employee_list')
+
+    # Generate the probation extension letter
+    try:
+        # Find the probation extension template
+        extension_template = DocumentTemplate.objects.get(template_type='probation_extension_letter')
+
+        # Generate document using the template
+        context = {
+            'employee_name': employee.name,
+            'employee_id': employee.employee_id,
+            'designation': employee.designation,
+            'department': employee.department.name if employee.department else employee.department,
+            'start_date': employee.start_date.strftime('%B %d, %Y'),
+            'end_date': employee.end_date.strftime('%B %d, %Y'),
+            'current_date': date.today().strftime('%B %d, %Y'),
+            'current_date_short': date.today().strftime('%Y-%m-%d'),
+            'probation_status': employee.probation_status,
+            'days_until_probation_end': employee.days_until_probation_end,
+            'approver': approval.approved_by,
+            'approval_date': approval.approval_date.strftime('%B %d, %Y') if approval.approval_date else 'N/A',
+            'extension_months': approval.extension_months,
+            'extension_start_date': employee.current_end_date.strftime('%B %d, %Y'),
+            'extension_end_date': approval.extended_end_date.strftime('%B %d, %Y') if approval.extended_end_date else '',
+        }
+
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+        from docxtpl import DocxTemplate
+
+        # If the template is a .docx file, process it with docxtpl
+        if extension_template.template_file.name.endswith('.docx'):
+            template_path = os.path.join(settings.MEDIA_ROOT, extension_template.template_file.name)
+            doc = DocxTemplate(template_path)
+            doc.render(context)
+
+            # Create a BytesIO buffer to hold the document
+            from io import BytesIO
+            buffer = BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
+
+            filename = f"Probation_Extension_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.docx"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            # Save the document to the file system as well
+            with open(filepath, 'wb') as f:
+                f.write(buffer.getvalue())
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=extension_template,
+                title=f"Probation Extension Letter for {employee.name}",
+                description=f"Probation extension letter for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            # Return the document as a downloadable response
+            response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        else:
+            # Create a simple text document based on the template content
+            # Read the template file content
+            template_path = os.path.join(settings.MEDIA_ROOT, extension_template.template_file.name)
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template_content = f.read()
+
+            # Replace placeholders in the template
+            doc_content = template_content.replace('[EMPLOYEE_NAME]', employee.name)
+            doc_content = doc_content.replace('[DESIGNATION]', employee.designation)
+            doc_content = doc_content.replace('[DEPARTMENT]', employee.department.name if employee.department else str(employee.department))
+            doc_content = doc_content.replace('[EXTENSION_START_DATE]', employee.current_end_date.strftime('%B %d, %Y'))
+            doc_content = doc_content.replace('[EXTENSION_END_DATE]', approval.extended_end_date.strftime('%B %d, %Y') if approval.extended_end_date else 'TBD')
+            doc_content = doc_content.replace('[EXTENSION_MONTHS]', str(approval.extension_months))
+            doc_content = doc_content.replace('[CURRENT_DATE]', date.today().strftime('%B %d, %Y'))
+
+            filename = f"Probation_Extension_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+            filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(doc_content)
+
+            # Create GeneratedDocument record
+            generated_doc = GeneratedDocument.objects.create(
+                employee=employee,
+                template=extension_template,
+                title=f"Probation Extension Letter for {employee.name}",
+                description=f"Probation extension letter for {employee.name}",
+                document_file=f"employees/{employee.employee_id}/{filename}"
+            )
+
+            # Return the document as a downloadable response
+            response = HttpResponse(doc_content, content_type='text/plain')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+    except DocumentTemplate.DoesNotExist:
+        # If no specific template exists, create a default probation extension letter
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+
+        # Calculate extension dates
+        from dateutil.relativedelta import relativedelta
+        extension_start_date = employee.current_end_date
+        extension_end_date = extension_start_date + relativedelta(months=approval.extension_months)
+
+        # Create default content
+        doc_content = f"""No. GIKI/HRD/PF.2140/{date.today().year}
+
+
+                                                                {date.today().strftime('%B')}       , {date.today().year}
+
+
+Mr. {employee.name}
+{employee.designation}, {employee.department}
+GIK Institute, Topi Swabi
+
+Subject: Extension of Probation Period
+
+In accordance with Clause 02 of your employment contract, the competent authority has approved the extension of your probation period for a further period of {approval.extension_months} months, effective from {extension_start_date.strftime('%B %d, %Y')} to {extension_end_date.strftime('%B %d, %Y')}, based on your performance during the initial probation period.
+This extension provides you with an opportunity to further demonstrate your skills and capabilities and meet the performance standards expected for your role.
+All other terms and conditions of your employment contract shall remain unchanged.
+
+For and on behalf of GIK Institute
+
+
+Syed Israr Hassan
+Deputy Director (HR)
+
+Coy to:
+• Dean ({employee.department})
+• Personal File"""
+
+        filename = f"Probation_Extension_Letter_{employee.employee_id}_{date.today().strftime('%Y%m%d')}.txt"
+        filepath = os.path.join(settings.MEDIA_ROOT, 'employees', employee.employee_id, filename)
+
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(doc_content)
+
+        # Create GeneratedDocument record
+        generated_doc = GeneratedDocument.objects.create(
+            employee=employee,
+            template=None,  # No template used
+            title=f"Probation Extension Letter for {employee.name}",
+            description=f"Default probation extension letter for {employee.name}",
+            document_file=f"employees/{employee.employee_id}/{filename}"
+        )
+
+        # Return the document as a downloadable response
+        response = HttpResponse(doc_content, content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        messages.error(request, f'Error creating probation extension letter: {str(e)}')
+        return redirect('employee_list')
+
+
+def send_department_email(request, employee_id):
+    """Send email notification to the department for an employee whose probation is expiring"""
+    if request.method == 'POST':
+        try:
+            employee = get_object_or_404(Employee, employee_id=employee_id)
+
+            # Get department email from the Department model
+            if employee.department and employee.department.email:
+                department_email = employee.department.email
+            else:
+                # If department email is not configured, use the default HR email
+                department_email = getattr(settings, 'HR_EMAIL', getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'))
+
+            if not department_email:
+                messages.error(request, 'No email address configured for this department or HR.')
+                return redirect('employee_list')
+
+            # Prepare email content
+            subject = f"Probation Period Expiring Soon - {employee.name} ({employee.employee_id})"
+
+            # Calculate probation progress percentage
+            total_probation_days = 180  # Assuming 6 months probation (approx.)
+            days_completed = total_probation_days - employee.days_until_probation_end
+            progress_percentage = int((days_completed / total_probation_days) * 100) if total_probation_days > 0 else 0
+
+            # Prepare context for the email template
+            context = {
+                'employee_name': employee.name,
+                'employee_id': employee.employee_id,
+                'employee_designation': employee.designation,
+                'employee_department': employee.department,
+                'employee_start_date': employee.start_date.strftime('%B %d, %Y'),
+                'employee_end_date': employee.end_date.strftime('%B %d, %Y'),
+                'days_until_probation_end': employee.days_until_probation_end,
+                'hr_contact': getattr(settings, 'HR_EMAIL', 'HR Department'),
+                'progress_percentage': progress_percentage,
+            }
+
+            # Render the HTML email template
+            from django.template.loader import render_to_string
+            html_message = render_to_string('hr_portal/enhanced_probation_notification_email.html', context)
+
+            # List of additional HR members to CC
+            hr_cc_emails = [
+                'hikmatullah@giki.edu.pk',
+                'nasirali@giki.edu.pk',
+                'saboor@giki.edu.pk',
+                'israr.hassan@giki.edu.pk',
+                'shahid@giki.edu.pk'
+            ]
+
+            # Add the main HR contact to CC list
+            main_hr = getattr(settings, 'HR_EMAIL', 'muhammad.hamza@giki.edu.pk')
+            if main_hr not in hr_cc_emails:
+                hr_cc_emails.insert(0, main_hr)
+
+            # Create and send the email with CC to HR
+            from django.core.mail import EmailMultiAlternatives
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=f"This is an HTML email notification about {employee.name}'s probation period. Please view it in a compatible email client.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[department_email],
+                cc=hr_cc_emails  # CC to main HR and additional HR members
+            )
+            email.attach_alternative(html_message, "text/html")
+            email.send()
+
+            # Create a notification record
+            ProbationNotification.objects.create(
+                employee=employee,
+                days_before_expiry=employee.days_until_probation_end,
+                sent=True,
+                notification_type='department_email_sent'
+            )
+
+            messages.success(request, f'Email notification sent successfully to {department_email} for {employee.name}.')
+            return redirect('employee_list')
+
+        except Exception as e:
+            messages.error(request, f'Error sending email notification: {str(e)}')
+            return redirect('employee_list')
+
+    # If not POST, redirect to employee list
+    return redirect('employee_list')
+
+
+""  
+"def send_employees_list_to_hrs(request):"  
+"    \"\"\"Send a list of employees whose probation is ending soon to HR members\"\"\""  
+"    from django.template.loader import render_to_string"  
+"    from django.core.mail import EmailMultiAlternatives"  
+"    from django.conf import settings"  
+"    from datetime import date, timedelta"  
+"    from hr_portal.models import Employee"  
+"    from django.http import JsonResponse"  
+"    from django.contrib import messages"  
+"    import json"  
+""  
+"    if request.method == 'POST':"  
+"        # Find employees with less than 30 days remaining in probation"  
+"        future_date = date.today() + timedelta(days=30)"  
+"        employees_queryset = Employee.objects.filter("  
+"            end_date__range=[date.today(), future_date],"  
+"            probation_status__in=['Active', 'Ending Soon']"  
+"        ).order_by('end_date')"  
+""  
+"        if not employees_queryset.exists():"  
+"            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':"  
+"                return JsonResponse({'success': False, 'message': 'No employees found with ending probation.'})"  
+"            messages.info(request, 'No employees found with less than 30 days remaining in probation.')"  
+"            return redirect('employee_list')"  
+""  
+"        # Prepare employee data with additional computed fields for the template"  
+"        employees = []"  
+"        for emp in employees_queryset:"  
+"            # Calculate probation progress percentage"  
+"            total_probation_days = 180  # Assuming 6 months probation (approx.)"  
+"            days_completed = total_probation_days - emp.days_until_probation_end"  
+"            progress_percentage = int((days_completed / total_probation_days) * 100) if total_probation_days > 0 else 0"  
+""  
+"            # Create a dict with all the properties needed for the template"  
+"            emp_data = {"  
+"                'id': emp.employee_id,"  
+"                'name': emp.name,"  
+"                'designation': emp.designation,"  
+"                'department': emp.department,"  
+"                'start_date': emp.start_date.strftime('%B %d, %Y'),"  
+"                'end_date': emp.end_date.strftime('%B %d, %Y'),"  
+"                'days_until_probation_end': emp.days_until_probation_end,"  
+"                'probation_completion_percent': emp.probation_completion_percent,"  
+"            }"  
+"            employees.append(emp_data)"  
+""  
+"        # Prepare context for the email template"  
+"        context = {"  
+"            'employees': employees,"  
+"            'current_date': date.today().strftime('%B %d, %Y'),"  
+"            'report_title': 'Employees with Ending Probation',"  
+"            'hr_contact': getattr(settings, 'HR_EMAIL', 'HR Department'),"  
+"        }"  
+""  
+"        # Render the HTML email template"  
+"        html_message = render_to_string('hr_portal/probation_report_email.html', context)"  
+""  
+"        # List of HR members to send the email to"  
+"        hr_emails = ["  
+"            'hamzamarwat46@gmail.com',"  
+"            'muhammad.hamza@giki.edu.pk',"  
+"            'hikmatullah@giki.edu.pk',"  
+"            'nasirali@giki.edu.pk',"  
+"            'saboor@giki.edu.pk',"  
+"            'israr.hassan@giki.edu.pk',"  
+"            'shahid@giki.edu.pk'"  
+"        ]"  
+""  
+"        # Add the main HR contact if it's not already in the list"  
+"        main_hr = getattr(settings, 'HR_EMAIL', 'muhammad.hamza@giki.edu.pk')"  
+"        if main_hr not in hr_emails:"  
+"            hr_emails.insert(0, main_hr)"  
+""  
+"        # Create and send the email to all HR members"  
+"        subject = f\"Weekly Probation Report: {len(employees)} Employees with Ending Probation ({date.today().strftime('%B %d, %Y')})\""  
+""  
+"        email = EmailMultiAlternatives("  
+"            subject=subject,"  
+"            body=f\"This is an HTML email report containing a list of employees whose probation periods are ending soon. Please view it in a compatible email client.\","  
+"            from_email=settings.DEFAULT_FROM_EMAIL,"  
+"            to=hr_emails  # Send to all HR members"  
+"        )"  
+"        email.attach_alternative(html_message, \"text/html\")"  
+"        email.send()"  
+""  
+"        success_message = f'Probation report sent successfully to {len(hr_emails)} HR members. Report contains {len(employees)} employees.'"  
+"        "  
+"        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':"  
+"            return JsonResponse({'success': True, 'message': success_message})"  
+"        "  
+"        messages.success(request, success_message)"  
+"        return redirect('employee_list')"  
+"    "  
+"    # If not POST, redirect to dashboard
+    return redirect('dashboard')"  

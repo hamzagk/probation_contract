@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Contracts - HR Portal{% endblock %}
+{% block page_title %}Contracts{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex justify-end gap-2">
+        <a href="{% url 'contract_import' %}" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+            <i class="fas fa-file-import mr-2"></i>Import Word/Excel
+        </a>
+        <a href="{% url 'contract_report' %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200">
+            <i class="fas fa-chart-bar mr-2"></i>Report
+        </a>
+    </div>
+
+    <form method="get" class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Search contracts..." class="border border-gray-300 rounded-md px-3 py-2">
+            <select name="status" class="border border-gray-300 rounded-md px-3 py-2">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expired</option>
+                <option value="renewed" {% if status_filter == 'renewed' %}selected{% endif %}>Renewed</option>
+            </select>
+            <select name="department" class="border border-gray-300 rounded-md px-3 py-2">
+                <option value="">All departments</option>
+                {% for department in departments %}
+                <option value="{{ department.id }}" {% if department_filter == department.id|stringformat:"s" %}selected{% endif %}>{{ department.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="date_range" class="border border-gray-300 rounded-md px-3 py-2">
+                <option value="">Any date</option>
+                <option value="ending_30" {% if date_range == 'ending_30' %}selected{% endif %}>Ending in 30 days</option>
+                <option value="ending_60" {% if date_range == 'ending_60' %}selected{% endif %}>Ending in 60 days</option>
+                <option value="overdue" {% if date_range == 'overdue' %}selected{% endif %}>Overdue</option>
+                <option value="expired" {% if date_range == 'expired' %}selected{% endif %}>Expired</option>
+            </select>
+            <button type="submit" class="bg-blue-600 text-white rounded-md px-4 py-2 hover:bg-blue-700">Filter</button>
+        </div>
+    </form>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-white border border-gray-200 rounded-lg p-4"><div class="text-xs text-gray-500">Total</div><div class="text-xl font-semibold">{{ stats.total }}</div></div>
+        <div class="bg-white border border-gray-200 rounded-lg p-4"><div class="text-xs text-gray-500">Active</div><div class="text-xl font-semibold text-green-700">{{ stats.active }}</div></div>
+        <div class="bg-white border border-gray-200 rounded-lg p-4"><div class="text-xs text-gray-500">Ending Soon</div><div class="text-xl font-semibold text-amber-700">{{ stats.ending_soon }}</div></div>
+        <div class="bg-white border border-gray-200 rounded-lg p-4"><div class="text-xs text-gray-500">Expired</div><div class="text-xl font-semibold text-red-700">{{ stats.expired }}</div></div>
+        <div class="bg-white border border-gray-200 rounded-lg p-4"><div class="text-xs text-gray-500">Renewed</div><div class="text-xl font-semibold text-blue-700">{{ stats.renewed }}</div></div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Employee</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Department</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Term</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Start</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">End</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Days Left</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for employee in page_obj %}
+                    <tr>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-900">{{ employee.name }}</div>
+                            <div class="text-xs text-gray-500">{{ employee.employee_id }} - {{ employee.designation }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">{{ employee.department|default:"Unassigned" }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">{{ employee.contract_duration_label }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">{{ employee.contract_start_date|date:"M d, Y" }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">{{ employee.current_contract_end_date|date:"M d, Y" }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium
+                                {% if employee.contract_status == 'active' %}bg-green-100 text-green-800
+                                {% elif employee.contract_status == 'expiring_soon' %}bg-amber-100 text-amber-800
+                                {% elif employee.contract_status == 'expired' %}bg-red-100 text-red-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ employee.get_contract_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm {% if employee.days_until_contract_end < 0 %}text-red-700 font-semibold{% elif employee.days_until_contract_end <= 30 %}text-amber-700 font-semibold{% else %}text-gray-700{% endif %}">
+                            {{ employee.days_until_contract_end }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap gap-2">
+                                <a href="{% url 'contract_detail' employee.id %}" class="text-blue-700 hover:text-blue-900 text-sm font-medium">Manage</a>
+                                {% if employee.days_until_contract_end >= 0 and employee.days_until_contract_end <= 60 %}
+                                <form method="post" action="{% url 'send_contract_renewal_email' employee.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-green-700 hover:text-green-900 text-sm font-medium">Email</button>
+                                </form>
+                                <a href="{% url 'contract_detail' employee.id %}#renewal-email-panel" class="text-amber-700 hover:text-amber-900 text-sm font-medium">Custom Email</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-10 text-center text-gray-500">No contracts found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-between text-sm">
+            {% if page_obj.has_previous %}
+            <a class="text-blue-700" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+            {% else %}<span></span>{% endif %}
+            <span class="text-gray-600">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a class="text-blue-700" href="?page={{ page_obj.next_page_number }}">Next</a>
+            {% else %}<span></span>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

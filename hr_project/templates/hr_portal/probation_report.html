@@ -1,0 +1,470 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Probation Report - HR Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .report-header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        color: white;
+    }
+    
+    .report-header h1 {
+        margin: 0 0 10px 0;
+        font-size: 32px;
+    }
+    
+    .report-header p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 14px;
+    }
+    
+    .filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        align-items: end;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .form-group label {
+        margin-bottom: 5px;
+        color: #7f8c8d;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .form-group select,
+    .form-group input {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+    
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s;
+    }
+    
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #2980b9;
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #219a52;
+    }
+    
+    .report-content {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .summary-card {
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .summary-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: #7f8c8d;
+        text-transform: uppercase;
+    }
+    
+    .summary-card .value {
+        font-size: 36px;
+        font-weight: bold;
+    }
+    
+    .summary-card.total { background: #e3f2fd; }
+    .summary-card.total .value { color: #1976d2; }
+    
+    .summary-card.active { background: #e8f5e9; }
+    .summary-card.active .value { color: #388e3c; }
+    
+    .summary-card.ending { background: #fff3e0; }
+    .summary-card.ending .value { color: #f57c00; }
+    
+    .summary-card.completed { background: #f3e5f5; }
+    .summary-card.completed .value { color: #7b1fa2; }
+    
+    .summary-card.extended { background: #ffebee; }
+    .summary-card.extended .value { color: #c62828; }
+    
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    
+    .report-table th,
+    .report-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ecf0f1;
+    }
+    
+    .report-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .report-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    
+    .status-active {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    
+    .status-ending-soon {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+    
+    .status-completed {
+        background: #e8f5e9;
+        color: #388e3c;
+    }
+    
+    .status-extended {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+    
+    .print-section {
+        text-align: right;
+        margin-bottom: 20px;
+    }
+    
+    @media print {
+        .filter-section,
+        .print-section,
+        .btn {
+            display: none !important;
+        }
+        
+        .report-container {
+            padding: 0;
+        }
+        
+        .report-content {
+            box-shadow: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-container">
+    <div class="report-header">
+        <h1>📊 {{ report_data.title }}</h1>
+        <p>Generated on {{ report_data.generated_at|date:"F d, Y H:i:s" }}</p>
+    </div>
+    
+    <div class="filter-section">
+        <form method="get" class="filter-form">
+            <div class="form-group">
+                <label>Report Type</label>
+                <select name="type">
+                    <option value="summary" {% if report_type == 'summary' %}selected{% endif %}>Summary Report</option>
+                    <option value="detailed" {% if report_type == 'detailed' %}selected{% endif %}>Detailed Report</option>
+                    <option value="ending_soon" {% if report_type == 'ending_soon' %}selected{% endif %}>Ending Soon Report</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Department</label>
+                <select name="department">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.id }}" {% if selected_department == dept.id|stringformat:"s" %}selected{% endif %}>
+                        {{ dept.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Date From</label>
+                <input type="date" name="date_from" value="{{ date_from }}">
+            </div>
+            
+            <div class="form-group">
+                <label>Date To</label>
+                <input type="date" name="date_to" value="{{ date_to }}">
+            </div>
+            
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary">🔄 Generate Report</button>
+                <button type="button" class="btn btn-success" onclick="window.print()">🖨️ Print</button>
+                <a href="{% url 'probation_dashboard' %}" class="btn" style="background: #95a5a6; color: white;">← Back</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="report-content">
+        {% if report_type == 'summary' %}
+        <!-- Summary Report -->
+        <h2 style="color: #2c3e50; margin-bottom: 20px;">Executive Summary</h2>
+        
+        <div class="summary-grid">
+            <div class="summary-card total">
+                <h3>Total Employees</h3>
+                <div class="value">{{ report_data.total_employees }}</div>
+            </div>
+            
+            <div class="summary-card active">
+                <h3>Active Probation</h3>
+                <div class="value">{{ report_data.by_status.active }}</div>
+            </div>
+            
+            <div class="summary-card ending">
+                <h3>Ending Soon</h3>
+                <div class="value">{{ report_data.by_status.ending_soon }}</div>
+            </div>
+            
+            <div class="summary-card completed">
+                <h3>Completed</h3>
+                <div class="value">{{ report_data.by_status.completed }}</div>
+            </div>
+            
+            <div class="summary-card extended">
+                <h3>Extended</h3>
+                <div class="value">{{ report_data.by_status.extended }}</div>
+            </div>
+        </div>
+        
+        <h3 style="color: #2c3e50; margin: 30px 0 15px 0;">Time-Based Analysis</h3>
+        
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Timeframe</th>
+                    <th>Count</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Ending in 7 Days</td>
+                    <td><strong>{{ report_data.by_timeframe.ending_7_days }}</strong></td>
+                    <td><span class="status-badge status-ending-soon">Urgent</span></td>
+                </tr>
+                <tr>
+                    <td>Ending in 15 Days</td>
+                    <td><strong>{{ report_data.by_timeframe.ending_15_days }}</strong></td>
+                    <td><span class="status-badge status-ending-soon">Attention Needed</span></td>
+                </tr>
+                <tr>
+                    <td>Ending in 30 Days</td>
+                    <td><strong>{{ report_data.by_timeframe.ending_30_days }}</strong></td>
+                    <td><span class="status-badge status-active">Monitoring</span></td>
+                </tr>
+                <tr>
+                    <td>Overdue</td>
+                    <td><strong>{{ report_data.by_timeframe.overdue }}</strong></td>
+                    <td><span class="status-badge" style="background: #ffebee; color: #c62828;">Critical</span></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        {% elif report_type == 'detailed' %}
+        <!-- Detailed Report -->
+        <h2 style="color: #2c3e50; margin-bottom: 20px;">Detailed Employee List</h2>
+        
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Department</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th>Days Remaining</th>
+                    <th>Progress</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for emp in report_data.employees %}
+                <tr>
+                    <td>{{ emp.employee_id }}</td>
+                    <td><strong>{{ emp.name }}</strong></td>
+                    <td>{{ emp.designation }}</td>
+                    <td>{{ emp.department }}</td>
+                    <td>{{ emp.start_date }}</td>
+                    <td>
+                        {{ emp.end_date }}
+                        {% if emp.is_extended %}
+                        <div style="font-size: 11px; color: #f39c12;">(Extended)</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ emp.probation_status|slugify }}">
+                            {{ emp.probation_status }}
+                        </span>
+                    </td>
+                    <td>{{ emp.days_remaining }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="flex: 1; height: 8px; background: #ecf0f1; border-radius: 4px; overflow: hidden;">
+                                <div style="width: {{ emp.completion_percent }}%; height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71);"></div>
+                            </div>
+                            <span style="font-size: 12px; color: #7f8c8d;">{{ emp.completion_percent }}%</span>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px; color: #95a5a6;">
+                        No employees found matching the criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% elif report_type == 'ending_soon' %}
+        <!-- Ending Soon Report -->
+        <h2 style="color: #2c3e50; margin-bottom: 20px;">Employees with Probation Ending Soon</h2>
+        <p style="color: #7f8c8d; margin-bottom: 20px;">
+            List of employees whose probation period is ending within the next 30 days
+        </p>
+        
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Department</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Days Left</th>
+                    <th>Status</th>
+                    <th>Action Required</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for employee in report_data.employees %}
+                <tr>
+                    <td>{{ employee.employee_id }}</td>
+                    <td><strong>{{ employee.name }}</strong></td>
+                    <td>{{ employee.designation }}</td>
+                    <td>{{ employee.department.name|default:"N/A" }}</td>
+                    <td>{{ employee.start_date }}</td>
+                    <td>
+                        {{ employee.end_date }}
+                        {% if employee.is_extended %}
+                        <div style="font-size: 11px; color: #f39c12;">(Extended)</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong style="color: {% if employee.days_until_probation_end <= 7 %}#e74c3c{% elif employee.days_until_probation_end <= 15 %}#f39c12{% else %}#3498db{% endif %};">
+                            {{ employee.days_until_probation_end }}
+                        </strong>
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ employee.probation_status|slugify }}">
+                            {{ employee.probation_status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if employee.days_until_probation_end <= 7 %}
+                            <span style="color: #e74c3c; font-weight: 600;">⚠️ Immediate</span>
+                        {% elif employee.days_until_probation_end <= 15 %}
+                            <span style="color: #f39c12; font-weight: 600;">⚠️ Soon</span>
+                        {% else %}
+                            <span style="color: #3498db;">📋 Review</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px; color: #95a5a6;">
+                        No employees with probation ending in the next 30 days.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ecf0f1; text-align: center; color: #95a5a6; font-size: 13px;">
+            <p>This report was automatically generated by the HR Portal System</p>
+            <p>For questions or concerns, contact the HR Department</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

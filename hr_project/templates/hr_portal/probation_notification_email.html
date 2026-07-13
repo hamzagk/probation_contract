@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Probation Notification - GIK Institute</title>
+    <style>
+        /* GIK Institute Brand Colors */
+        :root {
+            --gik-blue: #1e3a8a; /* Dark blue */
+            --gik-light-blue: #3b82f6; /* Light blue */
+            --gik-accent: #1d4ed8; /* Accent blue */
+            --gik-gold: #d97706; /* Gold accent */
+            --white: #ffffff;
+            --light-gray: #f8fafc;
+            --medium-gray: #e2e8f0;
+            --dark-gray: #64748b;
+            --black: #0f172a;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            line-height: 1.7;
+            color: var(--black);
+            max-width: 650px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f4f8;
+        }
+
+        .container {
+            background-color: var(--white);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            position: relative;
+            border: 1px solid var(--medium-gray);
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, var(--gik-blue), var(--gik-gold), var(--gik-light-blue));
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--medium-gray);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+
+        .logo {
+            font-family: 'Arial Black', 'Arial Bold', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--gik-blue);
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+        }
+
+        .tagline {
+            color: var(--dark-gray);
+            font-size: 14px;
+            font-style: italic;
+            margin: 0;
+        }
+
+        .greeting {
+            font-size: 18px;
+            color: var(--black);
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .content {
+            margin: 25px 0;
+            line-height: 1.8;
+        }
+
+        .employee-details {
+            background: linear-gradient(to bottom, #f8fafc, #ffffff);
+            border: 1px solid var(--medium-gray);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .employee-name {
+            font-size: 22px;
+            font-weight: bold;
+            color: var(--gik-blue);
+            margin: 0 0 10px 0;
+        }
+
+        .employee-id {
+            font-size: 18px;
+            color: var(--gik-gold);
+            font-weight: 600;
+            margin: 0 0 15px 0;
+        }
+
+        .employee-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-row {
+            margin-bottom: 8px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: var(--gik-blue);
+            display: inline-block;
+            min-width: 120px;
+        }
+
+        .info-value {
+            color: var(--black);
+            font-weight: 500;
+        }
+
+        .days-remaining {
+            display: inline-block;
+            background: var(--gik-gold);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .closing {
+            font-size: 16px;
+            color: var(--black);
+            margin: 25px 0;
+        }
+
+        .signature {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--medium-gray);
+        }
+
+        .signature-line {
+            font-weight: 600;
+            color: var(--gik-blue);
+            margin-bottom: 3px;
+            font-size: 16px;
+        }
+
+        .signature-title {
+            color: var(--dark-gray);
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid var(--medium-gray);
+            text-align: center;
+            color: var(--dark-gray);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .footer-logo {
+            font-weight: 700;
+            color: var(--gik-blue);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        @media (max-width: 500px) {
+            .employee-info {
+                grid-template-columns: 1fr;
+            }
+
+            .logo-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <h1 class="logo">GIK Institute</h1>
+            </div>
+            <p class="tagline">Excellence in Science and Technology Education</p>
+        </div>
+
+        <p class="greeting">Dear Department Head,</p>
+
+        <div class="content">
+            <p>This is to inform you that the probation period for <strong>{{ employee_name }}</strong> (ID: <strong>{{ employee_id }}</strong>), <strong>{{ employee_designation }}</strong> in the <strong>{{ employee_department }}</strong> department, is ending soon on <strong>{{ employee_end_date }}</strong>.</p>
+
+            <p>Please review the employee's performance and take necessary action regarding their confirmation.</p>
+        </div>
+
+        <div class="employee-details">
+            <h3 class="employee-name">{{ employee_name }}</h3>
+            <div class="employee-id">ID: {{ employee_id }}</div>
+
+            <div class="employee-info">
+                <div class="info-row">
+                    <span class="info-label">Designation:</span>
+                    <span class="info-value">{{ employee_designation }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Department:</span>
+                    <span class="info-value">{{ employee_department }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Start Date:</span>
+                    <span class="info-value">{{ employee_start_date }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">End Date:</span>
+                    <span class="info-value">{{ employee_end_date }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Days Remaining:</span>
+                    <span class="info-value">{{ days_until_probation_end }} <span class="days-remaining">{{ days_until_probation_end }} days</span></span>
+                </div>
+            </div>
+        </div>
+
+        <p class="closing">Thank you for your attention to this matter.</p>
+
+        <div class="signature">
+            <div class="signature-line">Best regards,</div>
+            <div class="signature-line">HR Department</div>
+            <div class="signature-title">GIK Institute</div>
+        </div>
+
+        <div class="footer">
+            <span class="footer-logo">GIK Institute HR Portal</span>
+            <p>This is an automated notification from the GIK Institute HR Portal.</p>
+        </div>
+    </div>
+</body>
+</html>

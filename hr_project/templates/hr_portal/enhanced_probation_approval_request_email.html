@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Probation Approval Request - GIK Institute</title>
+    <style>
+        /* GIK Institute Brand Colors */
+        :root {
+            --gik-blue: #1e3a8a; /* Dark blue */
+            --gik-light-blue: #3b82f6; /* Light blue */
+            --gik-accent: #1d4ed8; /* Accent blue */
+            --gik-gold: #d97706; /* Gold accent */
+            --gik-dark-gold: #b45309; /* Darker gold */
+            --white: #ffffff;
+            --light-gray: #f8fafc;
+            --medium-gray: #e2e8f0;
+            --dark-gray: #64748b;
+            --black: #0f172a;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            color: var(--black);
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f0f4f8, #e6f0ff);
+        }
+
+        .container {
+            background-color: var(--white);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--medium-gray);
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 12px;
+            background: linear-gradient(90deg, var(--gik-blue), var(--gik-gold), var(--gik-light-blue));
+        }
+
+        .watermark {
+            position: absolute;
+            opacity: 0.03;
+            font-size: 120px;
+            font-weight: bold;
+            color: var(--gik-blue);
+            transform: rotate(-30deg);
+            z-index: 0;
+            top: 50%;
+            left: 50%;
+            transform-origin: center;
+            pointer-events: none;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 35px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid var(--medium-gray);
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .logo {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--gik-blue);
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            position: relative;
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--gik-gold), transparent);
+        }
+
+        .tagline {
+            color: var(--gik-dark-gold);
+            font-size: 16px;
+            font-style: italic;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .greeting {
+            font-size: 20px;
+            color: var(--black);
+            margin-bottom: 25px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .urgent-highlight {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border: 1px solid #fbbf24;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+            font-weight: 600;
+            color: #92400e;
+            position: relative;
+            z-index: 1;
+        }
+
+        .urgent-highlight::before {
+            content: '🚨';
+            margin-right: 10px;
+            font-size: 18px;
+        }
+
+        .content {
+            margin: 25px 0;
+            line-height: 1.8;
+            position: relative;
+            z-index: 1;
+        }
+
+        .highlight-box {
+            background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+            border-left: 4px solid var(--gik-gold);
+            padding: 20px;
+            margin: 25px 0;
+            font-weight: 500;
+            color: #0c4a6e;
+            border-radius: 0 8px 8px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .employee-details {
+            background: linear-gradient(to bottom, #f8fafc, #ffffff);
+            border: 1px solid var(--medium-gray);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            position: relative;
+            z-index: 1;
+        }
+
+        .employee-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--medium-gray);
+        }
+
+        .employee-name {
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--gik-blue);
+            margin: 0 0 8px 0;
+        }
+
+        .employee-id {
+            font-size: 20px;
+            color: var(--gik-gold);
+            font-weight: 600;
+            margin: 0 0 15px 0;
+        }
+
+        .employee-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-top: 15px;
+        }
+
+        .info-row {
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: var(--gik-blue);
+            display: inline-block;
+            min-width: 130px;
+            flex: 0 0 130px;
+        }
+
+        .info-value {
+            color: var(--black);
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .days-remaining {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--gik-gold), var(--gik-dark-gold));
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .progress-container {
+            margin: 25px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--gik-blue), var(--gik-gold));
+            border-radius: 10px;
+            width: 75%; /* This would be dynamically calculated */
+        }
+
+        .action-section {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .action-button {
+            display: inline-block;
+            padding: 14px 25px;
+            background: linear-gradient(135deg, var(--gik-blue), var(--gik-accent));
+            color: white !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 5px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(30, 58, 138, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(30, 58, 138, 0.4);
+        }
+
+        .action-button.approve {
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+        }
+
+        .action-button.reject {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+        }
+
+        .action-button.extend {
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        }
+
+        .next-steps {
+            background: linear-gradient(to bottom, #f0fdf4, #dcfce7);
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .next-steps h4 {
+            color: #166534;
+            margin-top: 0;
+            border-bottom: 1px solid #bbf7d0;
+            padding-bottom: 8px;
+        }
+
+        .next-steps ul {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+
+        .next-steps li {
+            margin-bottom: 8px;
+        }
+
+        .closing {
+            font-size: 17px;
+            color: var(--black);
+            margin: 25px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .signature {
+            margin-top: 40px;
+            padding-top: 25px;
+            border-top: 1px solid var(--medium-gray);
+            position: relative;
+            z-index: 1;
+        }
+
+        .signature-line {
+            font-weight: 600;
+            color: var(--gik-blue);
+            margin-bottom: 5px;
+            font-size: 17px;
+        }
+
+        .signature-title {
+            color: var(--dark-gray);
+            font-size: 15px;
+            font-style: italic;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .contact-item {
+            text-align: center;
+        }
+
+        .contact-label {
+            font-weight: 600;
+            color: var(--gik-blue);
+            font-size: 14px;
+        }
+
+        .contact-value {
+            color: var(--black);
+            font-size: 15px;
+        }
+
+        .footer {
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 1px solid var(--medium-gray);
+            text-align: center;
+            color: var(--dark-gray);
+            font-size: 14px;
+            line-height: 1.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        .footer-logo {
+            font-weight: 700;
+            color: var(--gik-blue);
+            margin-bottom: 8px;
+            display: block;
+            font-size: 18px;
+        }
+
+        .footer-disclaimer {
+            font-size: 12px;
+            color: var(--dark-gray);
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        @media (max-width: 500px) {
+            .employee-info {
+                grid-template-columns: 1fr;
+            }
+
+            .logo-container {
+                flex-direction: column;
+            }
+
+            .container {
+                padding: 25px 20px;
+            }
+
+            .employee-name {
+                font-size: 22px;
+            }
+
+            .employee-id {
+                font-size: 18px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .action-button {
+                width: 100%;
+                max-width: 250px;
+            }
+
+            .contact-info {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="watermark">GIK INSTITUTE</div>
+        
+        <div class="header">
+            <div class="logo-container">
+                <h1 class="logo">GIK Institute</h1>
+            </div>
+            <p class="tagline">Excellence in Science and Technology Education</p>
+        </div>
+
+        <p class="greeting">Dear Department Head,</p>
+
+        <div class="urgent-highlight">
+            ACTION REQUIRED: PROBATION PERIOD ENDING SOON
+        </div>
+
+        <div class="content">
+            <div class="highlight-box">
+                The probation period for the following employee is ending in {{ days_remaining }} days. Please review and take necessary action:
+            </div>
+
+            <div class="employee-details">
+                <div class="employee-header">
+                    <h3 class="employee-name">{{ employee.name }}</h3>
+                    <div class="employee-id">ID: {{ employee.employee_id }}</div>
+                </div>
+
+                <div class="employee-info">
+                    <div class="info-row">
+                        <span class="info-label">Designation:</span>
+                        <span class="info-value">{{ employee.designation }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Department:</span>
+                        <span class="info-value">{{ employee.department }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Start Date:</span>
+                        <span class="info-value">{{ employee.start_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">End Date:</span>
+                        <span class="info-value">{{ employee.end_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Days Remaining:</span>
+                        <span class="info-value">{{ days_remaining }} <span class="days-remaining">{{ days_remaining }} days</span></span>
+                    </div>
+                </div>
+
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>Probation Progress</span>
+                        <span>{{ days_remaining }} days remaining</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ progress_percentage|default:"75" }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <p>Please review the employee's performance and approve or reject the probation period. Based on your decision, HR will proceed with the next steps:</p>
+
+            <div class="next-steps">
+                <h4>Next Steps Based on Your Decision:</h4>
+                <ul>
+                    <li><strong>If Approved:</strong> Issue probation completion letter and confirm employee</li>
+                    <li><strong>If Rejected:</strong> Initiate termination process</li>
+                    <li><strong>If Extended:</strong> Continue evaluation for additional period</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="action-section">
+            <p><strong>Take Action Now:</strong></p>
+            <div class="action-buttons">
+                <a href="{{ approval_link|default:"#" }}" class="action-button approve">Approve Probation</a>
+                <a href="{{ rejection_link|default:"#" }}" class="action-button reject">Reject Probation</a>
+                <a href="{{ extension_link|default:"#" }}" class="action-button extend">Extend Probation</a>
+            </div>
+            <p>Alternatively, you can log in to the HR Portal to review and take action.</p>
+        </div>
+
+        <div class="contact-info">
+            <div class="contact-item">
+                <div class="contact-label">Contact HR</div>
+                <div class="contact-value">{{ hr_contact|default:"HR Department" }}</div>
+            </div>
+            <div class="contact-item">
+                <div class="contact-label">Portal Access</div>
+                <div class="contact-value">hr.giki.edu.pk</div>
+            </div>
+        </div>
+
+        <p class="closing">We appreciate your prompt attention to this important matter. Timely action ensures proper HR protocol compliance and smooth operations.</p>
+
+        <div class="signature">
+            <div class="signature-line">Best regards,</div>
+            <div class="signature-line">Automated HR Notification System</div>
+            <div class="signature-title">GIK Institute Human Resources Department</div>
+        </div>
+
+        <div class="footer">
+            <span class="footer-logo">GIK Institute HR Portal</span>
+            <p>This is an automated notification from the GIK Institute HR Portal. Please take the required action within the specified timeframe.</p>
+            <p class="footer-disclaimer">This email is confidential and intended solely for the addressee. Please do not forward without authorization.</p>
+        </div>
+    </div>
+</body>
+</html>

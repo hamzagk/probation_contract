@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #111827;">
+    <h2>Contract Renewal Reminder</h2>
+    <p>Dear Concerned Authority,</p>
+    <p>The following employee contract is approaching expiration and requires renewal review.</p>
+    {% if pa_ps_emails %}
+    <p>This reminder also includes the concerned department PA/PS: {{ pa_ps_emails|join:", " }}.</p>
+    {% endif %}
+    <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Employee</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ employee.name }}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Employee ID</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ employee.employee_id }}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Designation</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ employee.designation }}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Department</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ employee.department|default:"Unassigned" }}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Contract Start</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ employee.contract_start_date|date:"M d, Y" }}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Contract Expiry</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ employee.current_contract_end_date|date:"M d, Y" }}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #e5e7eb;"><strong>Days Remaining</strong></td><td style="padding: 8px; border: 1px solid #e5e7eb;">{{ days_until_contract_end }}</td></tr>
+    </table>
+    <p>Please initiate the renewal process if continuation is approved.</p>
+    <p>Regards,<br>{{ hr_contact }}</p>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HR Portal - GIK Institute{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <style>
+        :root {
+            --primary-color: #1d4ed8;
+            --secondary-color: #3b82f6;
+            --accent-color: #8b5cf6;
+        }
+
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+
+        .main-content {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .probation-warning {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+
+        .mobile-menu-btn {
+            display: none;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="sidebar bg-white shadow-lg w-64 min-h-screen fixed h-full z-10">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-2xl font-bold text-blue-800">HR Portal</h1>
+                <p class="text-sm text-gray-600">GIK Institute</p>
+            </div>
+            <nav class="mt-6">
+                <a href="{% url 'dashboard' %}" class="flex items-center px-6 py-3 {% if request.resolver_match.url_name == 'dashboard' %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-tachometer-alt mr-3"></i>
+                    Dashboard
+                </a>
+                <a href="{% url 'probation_dashboard' %}" class="flex items-center px-6 py-3 {% if 'probation' in request.resolver_match.url_name %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-hourglass-half mr-3"></i>
+                    Probation Management
+                </a>
+                <a href="{% url 'contract_dashboard' %}" class="flex items-center px-6 py-3 {% if 'contract' in request.resolver_match.url_name %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-file-contract mr-3"></i>
+                    Contract Management
+                </a>
+                <a href="{% url 'employee_list' %}" class="flex items-center px-6 py-3 {% if request.resolver_match.url_name == 'employee_list' %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-users mr-3"></i>
+                    Employees
+                </a>
+                <a href="{% url 'import_employees' %}" class="flex items-center px-6 py-3 {% if request.resolver_match.url_name == 'import_employees' %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-file-import mr-3"></i>
+                    Import Data
+                </a>
+                <a href="{% url 'export_employees' %}" class="flex items-center px-6 py-3 {% if request.resolver_match.url_name == 'export_employees' %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-file-export mr-3"></i>
+                    Export Data
+                </a>
+                <a href="{% url 'document_management' %}" class="flex items-center px-6 py-3 {% if request.resolver_match.url_name == 'document_management' %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-folder-open mr-3"></i>
+                    Documents
+                </a>
+                <a href="{% url 'ai_assistant' %}" class="flex items-center px-6 py-3 {% if request.resolver_match.url_name == 'ai_assistant' %}text-blue-800 bg-blue-50 border-l-4 border-blue-800{% else %}text-gray-600 hover:bg-gray-50 hover:text-blue-800{% endif %}">
+                    <i class="fas fa-robot mr-3"></i>
+                    AI Assistant
+                </a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content ml-64 flex-1">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200 p-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-gray-800">{% block page_title %}{% endblock %}</h2>
+                    <div class="flex items-center space-x-4">
+                        {% if user.is_authenticated %}
+                            <span class="text-gray-700">Welcome, {{ user.username }}!</span>
+                            <a href="{% url 'logout' %}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                            </a>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-sign-in-alt mr-2"></i>Login
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="p-6">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="mb-4 p-4 rounded-md {% if message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200{% elif message.tags == 'success' %}bg-green-50 text-green-800 border border-green-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Global JavaScript functions for the HR portal
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mobile menu toggle functionality (if needed)
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('.main-content');
+
+            // Responsive behavior for smaller screens
+            function handleResize() {
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('fixed');
+                    sidebar.classList.add('relative');
+                    mainContent.classList.remove('ml-64');
+                } else {
+                    sidebar.classList.add('fixed');
+                    sidebar.classList.remove('relative');
+                    mainContent.classList.add('ml-64');
+                }
+            }
+
+            window.addEventListener('resize', handleResize);
+            handleResize(); // Initial check
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

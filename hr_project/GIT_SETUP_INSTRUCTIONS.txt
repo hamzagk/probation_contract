@@ -1,0 +1,26 @@
+# Commands to initialize and push to GitHub
+
+# 1. Initialize git in the project directory
+git init
+
+# 2. Add all files to git
+git add .
+
+# 3. Commit the files
+git commit -m "Initial commit: GIK Institute HR Portal with enhanced UI and GIK departments"
+
+# 4. Create a new repository on GitHub (do this in your browser first)
+# Go to https://github.com/new and create a repository named "gik-hr-portal"
+
+# 5. Add the GitHub repository as origin (replace YOUR_USERNAME with your actual GitHub username)
+git remote add origin https://github.com/YOUR_USERNAME/gik-hr-portal.git
+
+# 6. Push the code to GitHub
+git branch -M main
+git push -u origin main
+
+# 7. After pushing to GitHub, you can connect to deployment platforms:
+#    - Render: https://render.com
+#    - Railway: https://railway.app
+#    - Heroku: https://heroku.com
+#    - PythonAnywhere: https://pythonanywhere.com

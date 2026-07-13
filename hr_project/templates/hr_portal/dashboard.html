@@ -1,0 +1,520 @@
+{% extends 'base.html' %}
+{% load static %}
+{% csrf_token %}
+
+{% block title %}Advanced Dashboard - HR Portal{% endblock %}
+{% block page_title %}Advanced Dashboard{% endblock %}
+
+{% block content %}
+<style>
+/* Dual Background Gradient */
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
+}
+
+/* 3D Card Effects */
+.card-3d {
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-3d:hover {
+    transform: translateY(-10px) rotateX(5deg) rotateY(5deg);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Floating Elements */
+.floating-element {
+    animation: floating 3s ease-in-out infinite;
+}
+
+@keyframes floating {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+/* Glowing Effects */
+.glow-effect {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+.glow-effect:hover {
+    box-shadow: 0 0 25px rgba(59, 130, 246, 0.8);
+}
+
+/* Advanced Button Styles */
+.btn-3d {
+    position: relative;
+    transform: perspective(500px) rotateX(15deg);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.btn-3d::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    transition: 0.5s;
+}
+
+.btn-3d:hover::before {
+    left: 100%;
+}
+
+.btn-3d:hover {
+    transform: perspective(500px) rotateX(15deg) translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Gradient Text */
+.gradient-text {
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Animated Progress Bars */
+.progress-bar-animated {
+    position: relative;
+    overflow: hidden;
+    height: 10px;
+    border-radius: 5px;
+    background-color: #e5e7eb;
+}
+
+.progress-bar-animated::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(to right, #10b981, #3b82f6);
+    animation: progressAnimation 2s ease-in-out forwards;
+}
+
+@keyframes progressAnimation {
+    to { width: var(--progress-width); }
+}
+
+/* Enhanced Table Styles - Removed 3D effects */
+.table-enhanced {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.table-enhanced tr {
+    transition: all 0.3s ease;
+}
+
+.table-enhanced tr:hover {
+    background-color: #f8fafc;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(45deg, #2563eb, #7c3aed);
+}
+</style>
+
+<!-- Stats Cards with 3D Effects -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Employees Card -->
+    <div class="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 rounded-3xl shadow-2xl card-3d floating-element glow-effect">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium opacity-80">Total Employees</p>
+                <p class="text-4xl font-bold text-white mt-2">{{ total_employees }}</p>
+            </div>
+            <div class="p-4 rounded-full bg-blue-400 bg-opacity-30 backdrop-blur-sm">
+                <i class="fas fa-users text-white text-3xl"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="progress-bar-animated" style="--progress-width: 100%;"></div>
+        </div>
+    </div>
+
+    <!-- Active Probation Card -->
+    <div class="bg-gradient-to-br from-green-500 to-green-700 text-white p-6 rounded-3xl shadow-2xl card-3d floating-element glow-effect" style="animation-delay: 0.2s;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium opacity-80">Active Probation</p>
+                <p class="text-4xl font-bold text-white mt-2">{{ active_employees }}</p>
+            </div>
+            <div class="p-4 rounded-full bg-green-400 bg-opacity-30 backdrop-blur-sm">
+                <i class="fas fa-user-clock text-white text-3xl"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="progress-bar-animated" style="--progress-width: 70%;"></div>
+        </div>
+    </div>
+
+    <!-- Ending Soon Card -->
+    <div class="bg-gradient-to-br from-amber-500 to-amber-700 text-white p-6 rounded-3xl shadow-2xl card-3d floating-element glow-effect probation-warning" style="animation-delay: 0.4s;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium opacity-80">Ending Soon</p>
+                <p class="text-4xl font-bold text-white mt-2">{{ ending_soon_employees }}</p>
+            </div>
+            <div class="p-4 rounded-full bg-amber-400 bg-opacity-30 backdrop-blur-sm">
+                <i class="fas fa-hourglass-half text-white text-3xl"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="progress-bar-animated" style="--progress-width: 30%;"></div>
+        </div>
+    </div>
+
+    <!-- Completed Probation Card -->
+    <div class="bg-gradient-to-br from-purple-500 to-purple-700 text-white p-6 rounded-3xl shadow-2xl card-3d floating-element glow-effect" style="animation-delay: 0.6s;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium opacity-80">Completed</p>
+                <p class="text-4xl font-bold text-white mt-2">{{ completed_employees }}</p>
+            </div>
+            <div class="p-4 rounded-full bg-purple-400 bg-opacity-30 backdrop-blur-sm">
+                <i class="fas fa-check-circle text-white text-3xl"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="progress-bar-animated" style="--progress-width: 90%;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts and Data Section with 3D Effects -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Employee Distribution Chart -->
+    <div class="bg-white p-6 rounded-3xl shadow-2xl card-3d backdrop-blur-sm">
+        <h3 class="text-xl font-bold text-gray-800 mb-4 gradient-text">Employee Distribution by Department</h3>
+        <canvas id="departmentChart" width="400" height="200"></canvas>
+    </div>
+
+    <!-- Probation Status Chart -->
+    <div class="bg-white p-6 rounded-3xl shadow-2xl card-3d backdrop-blur-sm">
+        <h3 class="text-xl font-bold text-gray-800 mb-4 gradient-text">Probation Status Overview</h3>
+        <canvas id="probationChart" width="400" height="200"></canvas>
+    </div>
+</div>
+
+<div class="bg-white p-6 rounded-3xl shadow-2xl mb-8">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <h3 class="text-xl font-bold text-gray-800 gradient-text">Monthly Department-wise Bulk Probation Report</h3>
+            <p class="text-gray-600 mt-2">
+                {{ monthly_report_departments }} department-wise email{{ monthly_report_departments|pluralize }} ready for manual dispatch,
+                covering {{ monthly_report_employees }} employee{{ monthly_report_employees|pluralize }} this month.
+            </p>
+        </div>
+        <form method="post" action="{% url 'send_monthly_probation_report_manual' %}">
+            {% csrf_token %}
+            <button type="submit" class="bg-purple-600 text-white hover:bg-purple-700 font-bold py-3 px-6 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+                <i class="fas fa-envelope-open-text mr-2"></i>Send Monthly Bulk Report
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Critical Probation Expirations with Enhanced Styling (Removed 3D from table) -->
+<div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl shadow-2xl overflow-hidden mb-8 border border-gray-200">
+    <div class="p-6 bg-gradient-to-r from-red-600 to-red-800 text-white flex justify-between items-center">
+        <div>
+            <h3 class="text-2xl font-bold flex items-center">
+                <i class="fas fa-exclamation-triangle mr-3 text-yellow-300"></i>
+                Critical Probation Expirations
+            </h3>
+            <p class="opacity-90 mt-1 text-lg">Employees with probation ending in 30 days or less</p>
+        </div>
+        <div>
+            <button id="sendReportBtn" class="bg-white text-red-600 hover:bg-gray-100 font-bold py-3 px-6 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+                <i class="fas fa-paper-plane mr-2"></i>Send Report to HR
+            </button>
+        </div>
+    </div>
+    <div class="overflow-x-auto p-4">
+        <table class="min-w-full divide-y divide-gray-200 table-enhanced">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">S.#</th>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Designation</th>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Department</th>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">End Date</th>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Days Left</th>
+                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for employee in upcoming_expirations %}
+                <tr class="
+                    {% if employee.days_until_probation_end <= 1 %}bg-red-50 border-l-4 border-red-500
+                    {% elif employee.days_until_probation_end <= 15 %}bg-orange-50 border-l-4 border-orange-500
+                    {% elif employee.days_until_probation_end <= 30 %}bg-yellow-50 border-l-4 border-yellow-500
+                    {% else %}bg-white{% endif %}">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ employee.display_id }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ employee.name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ employee.designation }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ employee.department }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ employee.end_date|date:"M. j, Y" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm
+                        {% if employee.days_until_probation_end <= 1 %}text-red-600 font-bold
+                        {% elif employee.days_until_probation_end <= 15 %}text-orange-500 font-medium
+                        {% elif employee.days_until_probation_end <= 30 %}text-yellow-600
+                        {% else %}text-gray-500{% endif %}">
+                        {{ employee.days_until_probation_end }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        {% if employee.days_until_probation_end <= 30 %}
+                            <a href="{% url 'probation_approval' employee.display_id %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white
+                                {% if employee.days_until_probation_end <= 1 %}bg-red-600 hover:bg-red-700
+                                {% elif employee.days_until_probation_end <= 15 %}bg-orange-500 hover:bg-orange-600
+                                {% else %}bg-yellow-500 hover:bg-yellow-600{% endif %}
+                                focus:outline-none focus:ring-2 focus:ring-offset-2
+                                {% if employee.days_until_probation_end <= 1 %}focus:ring-red-500
+                                {% elif employee.days_until_probation_end <= 15 %}focus:ring-orange-500
+                                {% else %}focus:ring-yellow-500{% endif %}">
+                                <i class="fas fa-check-circle mr-2"></i> Review
+                            </a>
+                        {% else %}
+                            <span class="text-gray-400">N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <div class="flex flex-col items-center justify-center">
+                            <i class="fas fa-check-circle text-green-500 text-4xl mb-3"></i>
+                            <h3 class="text-lg font-medium text-gray-900">No Critical Expirations</h3>
+                            <p class="mt-1 text-sm text-gray-500">There are no employees with probation ending in 30 days or less.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Activity with Advanced Styling -->
+<div class="bg-white rounded-3xl shadow-2xl overflow-hidden card-3d">
+    <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <h3 class="text-xl font-bold text-gray-800 gradient-text">Recent Activity</h3>
+    </div>
+    <div class="p-6">
+        <div class="space-y-4">
+            {% for employee in recent_employees %}
+            <div class="flex items-start p-4 rounded-lg hover:bg-gray-50 transition-all duration-300">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+                        <i class="fas fa-user text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-900">{{ employee.name }}</p>
+                    <p class="text-sm text-gray-500">{{ employee.designation }} in {{ employee.department }}</p>
+                    <p class="text-xs text-gray-400">Added on {{ employee.start_date|date:"M. j, Y" }}</p>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-8">
+                <i class="fas fa-inbox text-gray-300 text-4xl mb-3"></i>
+                <p class="text-gray-500">No recent activities</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize charts
+    document.addEventListener('DOMContentLoaded', function() {
+        // Department distribution chart
+        const departmentCtx = document.getElementById('departmentChart').getContext('2d');
+        const departmentChart = new Chart(departmentCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ departments|safe }},
+                datasets: [{
+                    label: 'Number of Employees',
+                    data: {{ department_counts|safe }},
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(236, 72, 153, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(249, 115, 22, 0.8)',
+                        'rgba(16, 185, 129, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(16, 185, 129, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(236, 72, 153, 1)',
+                        'rgba(139, 92, 246, 1)',
+                        'rgba(249, 115, 22, 1)',
+                        'rgba(16, 185, 129, 1)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+
+        // Probation status chart
+        const probationCtx = document.getElementById('probationChart').getContext('2d');
+        const probationChart = new Chart(probationCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Active', 'Ending Soon', 'Completed'],
+                datasets: [{
+                    data: {{ probation_status_counts|safe }},
+                    backgroundColor: [
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(99, 102, 241, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(16, 185, 129, 1)',
+                        'rgba(245, 158, 11, 1)',
+                        'rgba(99, 102, 241, 1)'
+                    ],
+                    borderWidth: 1,
+                    hoverOffset: 15
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                    }
+                },
+                cutout: '60%',
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 2000,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+    });
+
+    // Add event listener for the send report button
+    document.getElementById('sendReportBtn').addEventListener('click', function() {
+        // Show a confirmation dialog
+        if (confirm('Are you sure you want to send the probation report to all HR members?')) {
+            // Show a loading state
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+            btn.disabled = true;
+
+            // Get CSRF token from hidden input
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            // Make an AJAX request to send the report
+            fetch('{% url "send_employees_list_to_hrs" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: 'csrfmiddlewaretoken=' + encodeURIComponent(csrfToken),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Restore the button
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+
+                // Show success or error message
+                if (data.success) {
+                    alert(data.message);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                // Restore the button
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+
+                console.error('Error:', error);
+                alert('An error occurred while sending the report.');
+            });
+        }
+    });
+
+</script>
+{% endblock %}

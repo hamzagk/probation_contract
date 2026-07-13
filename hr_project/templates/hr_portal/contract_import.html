@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Import Contracts - HR Portal{% endblock %}
+{% block page_title %}Import Contracts{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+    <h3 class="text-xl font-semibold text-gray-900 mb-2">Import Contract Renewal Data</h3>
+    <p class="text-sm text-gray-600 mb-6">Upload a Word or Excel file with columns like S #, Name, Designation, Domain/Faculty, DOJ, and Contract Expiry.</p>
+
+    <form method="post" enctype="multipart/form-data" class="space-y-5">
+        {% csrf_token %}
+        <div>
+            <label for="{{ form.contract_file.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">Word or Excel File</label>
+            {{ form.contract_file }}
+            {% if form.contract_file.errors %}
+            <div class="text-sm text-red-700 mt-2">{{ form.contract_file.errors }}</div>
+            {% endif %}
+        </div>
+        <div class="flex gap-3">
+            <button type="submit" class="bg-blue-600 text-white px-5 py-2.5 rounded-md hover:bg-blue-700">
+                <i class="fas fa-file-import mr-2"></i>Import Contracts
+            </button>
+            <a href="{% url 'contract_list' %}" class="bg-gray-100 text-gray-700 px-5 py-2.5 rounded-md hover:bg-gray-200">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

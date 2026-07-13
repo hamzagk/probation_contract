@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}{{ employee|default:"New" }} Employee{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen py-8">
+    <div class="max-w-4xl mx-auto px-4">
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <!-- Header Section -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="fas {% if employee %}fa-user-edit{% else %}fa-user-plus{% endif %} text-white text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h2 class="text-2xl font-bold text-white">{% if employee %}Edit Employee{% else %}Add New Employee{% endif %}</h2>
+                        <p class="text-blue-100 mt-1">Fill in the employee details below</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Section -->
+            <div class="p-6">
+                <form method="post" class="space-y-6">
+                    {% csrf_token %}
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label for="{{ form.employee_id.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-id-card text-blue-500 mr-2"></i>Employee ID
+                            </label>
+                            <div class="relative">
+                                <input type="text" name="{{ form.employee_id.name }}" value="{{ form.employee_id.value|default:'' }}"
+                                       id="{{ form.employee_id.id_for_label }}"
+                                       class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                                       {% if employee %}readonly{% endif %}>
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-hashtag text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.employee_id.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.employee_id.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="{{ form.name.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-user text-blue-500 mr-2"></i>Name
+                            </label>
+                            <div class="relative">
+                                <input type="text" name="{{ form.name.name }}" value="{{ form.name.value|default:'' }}"
+                                       id="{{ form.name.id_for_label }}"
+                                       class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                       placeholder="Enter full name">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-signature text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.name.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.name.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="{{ form.designation.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-briefcase text-blue-500 mr-2"></i>Designation
+                            </label>
+                            <div class="relative">
+                                <input type="text" name="{{ form.designation.name }}" value="{{ form.designation.value|default:'' }}"
+                                       id="{{ form.designation.id_for_label }}"
+                                       class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                       placeholder="Enter job title">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-user-tie text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.designation.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.designation.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="{{ form.department.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-building text-blue-500 mr-2"></i>Department
+                            </label>
+                            <div class="relative">
+                                {{ form.department }}
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-sitemap text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.department.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.department.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="{{ form.start_date.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>Start Date
+                            </label>
+                            <div class="relative">
+                                <input type="date" name="{{ form.start_date.name }}" value="{{ form.start_date.value|date:'Y-m-d'|default:'' }}"
+                                       id="{{ form.start_date.id_for_label }}"
+                                       class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                       placeholder="Select start date">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-calendar-day text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.start_date.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.start_date.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="{{ form.contract_start_date.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-file-contract text-blue-500 mr-2"></i>Contract Start Date
+                            </label>
+                            <div class="relative">
+                                <input type="date" name="{{ form.contract_start_date.name }}" value="{{ form.contract_start_date.value|date:'Y-m-d'|default:'' }}"
+                                       id="{{ form.contract_start_date.id_for_label }}"
+                                       class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-calendar-check text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.contract_start_date.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.contract_start_date.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2 md:col-span-2">
+                            <label for="{{ form.contract_duration_months.id_for_label }}" class="block text-sm font-semibold text-gray-700 flex items-center">
+                                <i class="fas fa-clock text-blue-500 mr-2"></i>Contract Duration Months
+                            </label>
+                            <div class="relative">
+                                <input type="number" min="1" name="{{ form.contract_duration_months.name }}" value="{{ form.contract_duration_months.value|default:12 }}"
+                                       id="{{ form.contract_duration_months.id_for_label }}"
+                                       class="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-calendar-plus text-gray-400"></i>
+                                </div>
+                            </div>
+                            {% if form.contract_duration_months.errors %}
+                                <div class="text-red-600 text-sm mt-1 flex items-center">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>{{ form.contract_duration_months.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-gray-200">
+                        <div class="flex flex-wrap gap-4">
+                            <button type="submit" class="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center">
+                                <i class="fas {% if employee %}fa-sync-alt{% else %}fa-plus-circle{% endif %} mr-2"></i>
+                                {% if employee %}Update{% else %}Create{% endif %} Employee
+                            </button>
+                            <a href="{% url 'employee_list' %}" class="px-8 py-3.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-semibold rounded-xl hover:from-gray-700 hover:to-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center">
+                                <i class="fas fa-arrow-left mr-2"></i>
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

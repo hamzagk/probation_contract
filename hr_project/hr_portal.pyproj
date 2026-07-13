@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.Python.Sdk">
+  <PropertyGroup>
+    <PythonVersion>3.12</PythonVersion>
+    <ProjectGuid>{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}</ProjectGuid>
+    <RootNamespace>hr_portal</RootNamespace>
+    <StartUpFile>manage.py</StartUpFile>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Content Include="manage.py" />
+    <Content Include="requirements.txt" />
+    <Content Include=".env" />
+    <Content Include="db.sqlite3" />
+    <Content Include="README.md" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Folder Include="hr_project\" />
+    <Folder Include="hr_portal\" />
+    <Folder Include="static\" />
+    <Folder Include="media\" />
+    <Folder Include="templates\" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PyFile Include="hr_project\settings.py" />
+    <PyFile Include="hr_project\urls.py" />
+    <PyFile Include="hr_project\wsgi.py" />
+    <PyFile Include="hr_project\__init__.py" />
+    <PyFile Include="hr_portal\admin.py" />
+    <PyFile Include="hr_portal\apps.py" />
+    <PyFile Include="hr_portal\models.py" />
+    <PyFile Include="hr_portal\tasks.py" />
+    <PyFile Include="hr_portal\urls.py" />
+    <PyFile Include="hr_portal\views.py" />
+    <PyFile Include="hr_portal\forms.py" />
+    <PyFile Include="hr_portal\__init__.py" />
+  </ItemGroup>
+</Project>

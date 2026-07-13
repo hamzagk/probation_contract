@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Contract Detail - HR Portal{% endblock %}
+{% block page_title %}Contract Detail{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-start gap-4">
+            <div>
+                <h3 class="text-2xl font-semibold text-gray-900">{{ employee.name }}</h3>
+                <p class="text-gray-600">{{ employee.employee_id }} - {{ employee.designation }}</p>
+            </div>
+            <span id="statusBadge" class="px-3 py-1 rounded-full text-sm font-medium
+                {% if employee.contract_status == 'active' %}bg-green-100 text-green-800
+                {% elif employee.contract_status == 'expiring_soon' %}bg-amber-100 text-amber-800
+                {% elif employee.contract_status == 'expired' %}bg-red-100 text-red-800
+                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                {{ employee.get_contract_status_display }}
+            </span>
+        </div>
+
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div><dt class="text-sm text-gray-500">Department</dt><dd class="font-medium text-gray-900">{{ employee.department|default:"Unassigned" }}</dd></div>
+            <div><dt class="text-sm text-gray-500">Contract Duration</dt><dd id="contractDuration" class="font-medium text-gray-900">{{ employee.contract_duration_label }}</dd></div>
+            <div><dt class="text-sm text-gray-500">Contract Start</dt><dd id="contractStartDate" class="font-medium text-gray-900">{{ employee.contract_start_date|date:"M d, Y" }}</dd></div>
+            <div><dt class="text-sm text-gray-500">Contract End</dt><dd id="contractEndDate" class="font-medium text-gray-900">{{ employee.current_contract_end_date|date:"M d, Y" }}</dd></div>
+            <div><dt class="text-sm text-gray-500">Days Remaining</dt><dd id="daysRemaining" class="font-medium text-gray-900">{{ employee.days_until_contract_end }}</dd></div>
+            <div><dt class="text-sm text-gray-500">Extended</dt><dd class="font-medium text-gray-900">{% if employee.is_contract_extended %}Yes{% else %}No{% endif %}</dd></div>
+        </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6 space-y-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Contract Actions</h3>
+        <div class="space-y-4 border border-blue-100 bg-blue-50 rounded-lg p-4">
+            <h4 class="font-medium text-blue-900">Issue New Contract</h4>
+            <p class="text-sm text-blue-800">Use this when a fresh faculty/staff contract is approved. Terms support 2 to 5 years and update the database immediately.</p>
+            <div>
+                <label class="block text-sm text-gray-600 mb-2" for="contractStartDateInput">New Contract Start Date</label>
+                <input id="contractStartDateInput" type="date" value="{{ today|date:'Y-m-d' }}" class="w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-2" for="contractTermYears">Contract Term</label>
+                <select id="contractTermYears" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    {% for years in contract_term_year_choices %}
+                    <option value="{{ years }}" {% if years == 2 %}selected{% endif %}>{{ years }} Year{{ years|pluralize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="space-y-4 border border-amber-100 bg-amber-50 rounded-lg p-4">
+            <h4 class="font-medium text-amber-900">Extend Existing Contract</h4>
+            <div>
+                <label class="block text-sm text-gray-600 mb-2" for="extensionMonths">Extension Months</label>
+                <input id="extensionMonths" type="number" min="1" value="12" class="w-full border border-gray-300 rounded-md px-3 py-2">
+            </div>
+        </div>
+        <div class="space-y-2">
+            <button data-action="renew" class="contract-action w-full bg-blue-600 text-white rounded-md px-4 py-2 hover:bg-blue-700">Issue New Contract</button>
+            <button data-action="extend" class="contract-action w-full bg-amber-600 text-white rounded-md px-4 py-2 hover:bg-amber-700">Extend Contract</button>
+            <button data-action="expire" class="contract-action w-full bg-red-600 text-white rounded-md px-4 py-2 hover:bg-red-700">Mark Expired</button>
+        </div>
+        <div id="actionMessage" class="mt-4 text-sm"></div>
+
+        <div id="renewal-email-panel" class="border-t border-gray-200 pt-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Renewal Email</h3>
+            {% if employee.days_until_contract_end >= 0 and employee.days_until_contract_end <= 60 %}
+            <form method="post" action="{% url 'send_contract_renewal_email' employee.id %}" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label for="recipientEmail" class="block text-sm text-gray-600 mb-2">Primary Recipient</label>
+                    <input id="recipientEmail" name="recipient_email" type="email" value="{{ email_form_defaults.recipient_email }}" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div>
+                    <label for="paPsEmail" class="block text-sm text-gray-600 mb-2">PA/PS Email(s)</label>
+                    <input id="paPsEmail" name="pa_ps_email" type="text" value="{{ email_form_defaults.pa_ps_email }}" placeholder="Enter PA/PS emails, separated by commas" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div>
+                    <label for="ccEmails" class="block text-sm text-gray-600 mb-2">Additional CC Email(s)</label>
+                    <input id="ccEmails" name="cc_emails" type="text" value="{{ email_form_defaults.cc_emails }}" placeholder="Optional extra CC emails" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white rounded-md px-4 py-2 hover:bg-green-700">Send Renewal Email</button>
+            </form>
+            {% else %}
+            <p class="text-sm text-gray-600">Renewal emails become available in the last 60 days before contract expiry.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.contract-action').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const action = button.dataset.action;
+        const extensionMonths = document.getElementById('extensionMonths').value;
+        const contractStartDate = document.getElementById('contractStartDateInput').value;
+        const contractTermYears = document.getElementById('contractTermYears').value;
+        const response = await fetch('{% url "contract_action" employee.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            },
+            body: JSON.stringify({
+                action: action,
+                extension_months: extensionMonths,
+                contract_start_date: contractStartDate,
+                contract_term_years: contractTermYears
+            }),
+        });
+        const data = await response.json();
+        const message = document.getElementById('actionMessage');
+        message.className = data.success ? 'mt-4 text-sm text-green-700' : 'mt-4 text-sm text-red-700';
+        message.textContent = data.message;
+        if (data.success) {
+            document.getElementById('daysRemaining').textContent = data.days_until_contract_end;
+            document.getElementById('contractStartDate').textContent = data.contract_start_date;
+            document.getElementById('contractEndDate').textContent = data.contract_end_date_display;
+            document.getElementById('contractDuration').textContent = data.contract_duration_label;
+            setTimeout(() => window.location.reload(), 800);
+        }
+    });
+});
+</script>
+{% endblock %}

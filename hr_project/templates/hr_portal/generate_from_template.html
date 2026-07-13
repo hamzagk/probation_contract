@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Generate Document from Template{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Generate Document for {{ employee.name }}</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Employee Information</h5>
+            <p class="card-text">
+                <strong>Name:</strong> {{ employee.name }}<br>
+                <strong>Employee ID:</strong> {{ employee.employee_id }}<br>
+                <strong>Designation:</strong> {{ employee.designation }}<br>
+                <strong>Department:</strong> {{ employee.department.name }}<br>
+                <strong>Start Date:</strong> {{ employee.start_date }}<br>
+            </p>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Template Information</h5>
+            <p class="card-text">
+                <strong>Template Name:</strong> {{ template.name }}<br>
+                <strong>Type:</strong> {{ template.get_template_type_display }}<br>
+                <strong>Description:</strong> {{ template.description }}<br>
+            </p>
+        </div>
+    </div>
+    
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="custom_content">Custom Content (optional):</label>
+            <textarea class="form-control" id="custom_content" name="custom_content" rows="6"></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Generate Document</button>
+        <a href="{% url 'employee_documents' employee.id %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,837 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Probation List - HR Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .probation-list-container {
+        padding: 20px;
+    }
+    
+    .page-header {
+        margin-bottom: 30px;
+    }
+    
+    .page-header h1 {
+        color: #2c3e50;
+        margin: 0 0 20px 0;
+        font-size: 28px;
+    }
+    
+    .filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        align-items: end;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .form-group label {
+        margin-bottom: 5px;
+        color: #7f8c8d;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .form-group select,
+    .form-group input {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+    
+    .form-group select:focus,
+    .form-group input:focus {
+        outline: none;
+        border-color: #3498db;
+    }
+    
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #2980b9;
+    }
+    
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #7f8c8d;
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #219a52;
+    }
+    
+    .btn-warning {
+        background: #f39c12;
+        color: white;
+    }
+    
+    .btn-warning:hover {
+        background: #d68910;
+    }
+    
+    .btn-danger {
+        background: #e74c3c;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background: #c0392b;
+    }
+    
+    .employee-table {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        background: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .table-header h2 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 18px;
+    }
+    
+    .bulk-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .bulk-actions select {
+        padding: 8px 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    thead {
+        background: #f8f9fa;
+    }
+    
+    th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    td {
+        padding: 15px;
+        border-bottom: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+    
+    tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .employee-name {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    
+    .employee-id {
+        color: #6c757d;
+        font-size: 13px;
+    }
+    
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    
+    .status-active {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    
+    .status-ending-soon {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+    
+    .status-completed {
+        background: #e8f5e9;
+        color: #388e3c;
+    }
+    
+    .status-extended {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+    
+    .status-rejected {
+        background: #ffebee;
+        color: #c62828;
+    }
+    
+    .days-cell {
+        text-align: center;
+    }
+    
+    .days-number {
+        font-size: 18px;
+        font-weight: bold;
+        color: #e74c3c;
+    }
+    
+    .days-label {
+        font-size: 12px;
+        color: #95a5a6;
+    }
+    
+    .progress-cell {
+        width: 150px;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #ecf0f1;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3498db, #2ecc71);
+        transition: width 0.3s;
+    }
+    
+    .action-cell {
+        white-space: nowrap;
+    }
+    
+    .action-cell .btn {
+        padding: 6px 12px;
+        font-size: 13px;
+        margin-right: 5px;
+    }
+    
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        padding: 20px;
+    }
+    
+    .pagination .step-links {
+        display: flex;
+        gap: 5px;
+    }
+    
+    .pagination a,
+    .pagination span {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        text-decoration: none;
+        color: #3498db;
+        transition: all 0.3s;
+    }
+    
+    .pagination a:hover {
+        background: #3498db;
+        color: white;
+    }
+    
+    .pagination .current {
+        background: #3498db;
+        color: white;
+        border-color: #3498db;
+    }
+    
+    .stats-bar {
+        display: flex;
+        gap: 20px;
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        flex-wrap: wrap;
+    }
+    
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .stat-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    
+    .dot-active { background: #3498db; }
+    .dot-ending-soon { background: #f39c12; }
+    .dot-completed { background: #27ae60; }
+    
+    .stat-label {
+        color: #6c757d;
+        font-size: 14px;
+    }
+    
+    .stat-value {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 16px;
+    }
+    
+    .checkbox-cell {
+        width: 40px;
+        text-align: center;
+    }
+    
+    .checkbox-cell input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal.active {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        margin-bottom: 20px;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        color: #2c3e50;
+    }
+    
+    .modal-body {
+        margin-bottom: 20px;
+    }
+    
+    .modal-footer {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        margin-bottom: 15px;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #3498db;
+    }
+    
+    textarea.form-control {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    @media (max-width: 768px) {
+        .employee-table {
+            overflow-x: auto;
+        }
+        
+        table {
+            min-width: 800px;
+        }
+        
+        .filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="probation-list-container">
+    <div class="page-header">
+        <h1>📋 Probation Employee List</h1>
+        
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <form method="get" class="filter-form">
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select name="status" id="status">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                        <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+                        <option value="Ending Soon" {% if status_filter == 'Ending Soon' %}selected{% endif %}>Ending Soon</option>
+                        <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                        <option value="Extended" {% if status_filter == 'Extended' %}selected{% endif %}>Extended</option>
+                        <option value="Rejected" {% if status_filter == 'Rejected' %}selected{% endif %}>Rejected</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <select name="department" id="department">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept.id }}" {% if department_filter == dept.id|stringformat:"s" %}selected{% endif %}>
+                            {{ dept.name }} ({{ dept.employee_count }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="date_range">Time Range</label>
+                    <select name="date_range" id="date_range">
+                        <option value="">All Time</option>
+                        <option value="ending_7" {% if date_range == 'ending_7' %}selected{% endif %}>Ending in 7 Days</option>
+                        <option value="ending_15" {% if date_range == 'ending_15' %}selected{% endif %}>Ending in 15 Days</option>
+                        <option value="ending_30" {% if date_range == 'ending_30' %}selected{% endif %}>Ending in 30 Days</option>
+                        <option value="overdue" {% if date_range == 'overdue' %}selected{% endif %}>Overdue</option>
+                        <option value="completed_week" {% if date_range == 'completed_week' %}selected{% endif %}>Completed This Week</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="extension">Extension Status</label>
+                    <select name="extension" id="extension">
+                        <option value="">All</option>
+                        <option value="extended" {% if extension_filter == 'extended' %}selected{% endif %}>Extended</option>
+                        <option value="not_extended" {% if extension_filter == 'not_extended' %}selected{% endif %}>Not Extended</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="q">Search</label>
+                    <input type="text" name="q" id="q" placeholder="Name, ID, or designation..." value="{{ search_query }}">
+                </div>
+                
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">🔍 Apply Filters</button>
+                    <a href="{% url 'probation_list' %}" class="btn btn-secondary">Clear Filters</a>
+                    <a href="{% url 'probation_report' %}?{{ request.GET.urlencode }}" class="btn btn-success" target="_blank">📄 Export Report</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Employee Table -->
+    <div class="employee-table">
+        <div class="table-header">
+            <h2>Employees ({{ stats.total }} total)</h2>
+            <div class="bulk-actions">
+                <input type="checkbox" id="select-all" title="Select All">
+                <select id="bulk-action-select">
+                    <option value="">Select Action...</option>
+                    <option value="approve">Approve (Complete Probation)</option>
+                    <option value="extend">Extend Probation</option>
+                    <option value="reject">Reject</option>
+                </select>
+                <button class="btn btn-primary" onclick="performBulkAction()">Apply</button>
+            </div>
+        </div>
+        
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-dot dot-active"></span>
+                <span class="stat-label">Active:</span>
+                <span class="stat-value">{{ stats.active }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-dot dot-ending-soon"></span>
+                <span class="stat-label">Ending Soon:</span>
+                <span class="stat-value">{{ stats.ending_soon }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-dot dot-completed"></span>
+                <span class="stat-label">Completed:</span>
+                <span class="stat-value">{{ stats.completed }}</span>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th class="checkbox-cell"><input type="checkbox" id="select-all-header"></th>
+                    <th>Employee</th>
+                    <th>Department</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th class="days-cell">Days Left</th>
+                    <th class="progress-cell">Progress</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for employee in page_obj %}
+                <tr>
+                    <td class="checkbox-cell">
+                        <input type="checkbox" class="employee-checkbox" value="{{ employee.id }}">
+                    </td>
+                    <td>
+                        <div class="employee-name">{{ employee.name }}</div>
+                        <div class="employee-id">ID: {{ employee.employee_id }}</div>
+                        <div style="font-size: 13px; color: #6c757d;">{{ employee.designation }}</div>
+                    </td>
+                    <td>{{ employee.department.name|default:"N/A" }}</td>
+                    <td>{{ employee.start_date }}</td>
+                    <td>
+                        {{ employee.end_date }}
+                        {% if employee.is_extended %}
+                        <div style="font-size: 11px; color: #f39c12;">(Extended)</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ employee.probation_status|slugify }}">
+                            {{ employee.probation_status }}
+                        </span>
+                    </td>
+                    <td class="days-cell">
+                        {% if employee.days_until_probation_end > 0 %}
+                        <div class="days-number">{{ employee.days_until_probation_end }}</div>
+                        <div class="days-label">days</div>
+                        {% else %}
+                        <div class="days-number" style="color: #e74c3c;">0</div>
+                        <div class="days-label">overdue</div>
+                        {% endif %}
+                    </td>
+                    <td class="progress-cell">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ employee.probation_completion_percent }}%"></div>
+                        </div>
+                        <div style="font-size: 11px; color: #95a5a6; margin-top: 3px;">
+                            {{ employee.probation_completion_percent }}%
+                        </div>
+                    </td>
+                    <td class="action-cell">
+                        <a href="{% url 'probation_detail' employee.id %}" class="btn btn-primary">View</a>
+                        <button class="btn btn-success" onclick="openActionModal({{ employee.id }}, '{{ employee.name }}', 'approve')">Approve</button>
+                        <button class="btn btn-warning" onclick="openActionModal({{ employee.id }}, '{{ employee.name }}', 'extend')">Extend</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px; color: #95a5a6;">
+                        No employees found matching your filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="pagination">
+            <span class="step-links">
+                {% if page_obj.has_previous %}
+                <a href="?{{ request.GET.urlencode }}&page=1">&laquo; First</a>
+                <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
+                {% endif %}
+                
+                <span class="current">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+                
+                {% if page_obj.has_next %}
+                <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
+                <a href="?{{ request.GET.urlencode }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Action Modal -->
+<div id="action-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-title">Probation Action</h3>
+        </div>
+        <div class="modal-body">
+            <p id="modal-employee-name"></p>
+            <input type="hidden" id="modal-employee-id">
+            <input type="hidden" id="modal-action">
+            
+            <label for="modal-comments">Comments (Optional)</label>
+            <textarea id="modal-comments" class="form-control" placeholder="Add any comments or notes..."></textarea>
+            
+            <div id="extension-months-field" style="display: none;">
+                <label for="modal-extension-months">Extension Period (months)</label>
+                <select id="modal-extension-months" class="form-control">
+                    <option value="1">1 month</option>
+                    <option value="2">2 months</option>
+                    <option value="3" selected>3 months</option>
+                    <option value="4">4 months</option>
+                    <option value="5">5 months</option>
+                    <option value="6">6 months</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeActionModal()">Cancel</button>
+            <button class="btn btn-primary" id="modal-confirm-btn" onclick="confirmAction()">Confirm</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Select all checkboxes
+    document.getElementById('select-all-header').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.employee-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+    
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.employee-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+    
+    // Open action modal
+    function openActionModal(employeeId, employeeName, action) {
+        document.getElementById('modal-employee-id').value = employeeId;
+        document.getElementById('modal-employee-name').textContent = `Employee: ${employeeName}`;
+        document.getElementById('modal-action').value = action;
+        
+        const actionTitles = {
+            'approve': '✅ Approve Probation',
+            'extend': '⏳ Extend Probation',
+            'reject': '❌ Reject Probation'
+        };
+        
+        document.getElementById('modal-title').textContent = actionTitles[action] || 'Probation Action';
+        
+        // Show/hide extension months field
+        const extensionField = document.getElementById('extension-months-field');
+        extensionField.style.display = action === 'extend' ? 'block' : 'none';
+        
+        document.getElementById('action-modal').classList.add('active');
+    }
+    
+    // Close action modal
+    function closeActionModal() {
+        document.getElementById('action-modal').classList.remove('active');
+        document.getElementById('modal-comments').value = '';
+    }
+    
+    // Confirm action
+    function confirmAction() {
+        const employeeId = document.getElementById('modal-employee-id').value;
+        const action = document.getElementById('modal-action').value;
+        const comments = document.getElementById('modal-comments').value;
+        const extensionMonths = document.getElementById('modal-extension-months').value;
+        
+        const data = {
+            action: action,
+            comments: comments,
+            extension_months: parseInt(extensionMonths)
+        };
+        
+        fetch(`/probation/${employeeId}/action/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`✓ ${data.message}`, 'success');
+                closeActionModal();
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showToast(`✗ ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('✗ Error: ' + error, 'error');
+        });
+    }
+    
+    // Bulk action
+    function performBulkAction() {
+        const action = document.getElementById('bulk-action-select').value;
+        if (!action) {
+            showToast('✗ Please select an action', 'error');
+            return;
+        }
+        
+        const checkboxes = document.querySelectorAll('.employee-checkbox:checked');
+        if (checkboxes.length === 0) {
+            showToast('✗ Please select at least one employee', 'error');
+            return;
+        }
+        
+        const employeeIds = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (!confirm(`Are you sure you want to ${action} probation for ${employeeIds.length} employee(s)?`)) {
+            return;
+        }
+        
+        const data = {
+            employee_ids: employeeIds,
+            action: action,
+            comments: `Bulk action: ${action}`,
+            extension_months: action === 'extend' ? 3 : 0
+        };
+        
+        fetch("{% url 'probation_bulk_action' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`✓ ${data.message}`, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showToast(`✗ ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('✗ Error: ' + error, 'error');
+        });
+    }
+    
+    // Show toast notification
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `alert-toast`;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 5px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            background: ${type === 'success' ? '#27ae60' : '#e74c3c'};
+            animation: slideIn 0.3s ease-out;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+    
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Send Department Email{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Send Department Email for {{ employee.name }}</h2>
+    
+    <p>You are about to send a department notification email for:</p>
+    <ul>
+        <li><strong>Employee:</strong> {{ employee.name }}</li>
+        <li><strong>ID:</strong> {{ employee.employee_id }}</li>
+        <li><strong>Department:</strong> {{ employee.department.name }}</li>
+        <li><strong>Status:</strong> {{ employee.probation_status }}</li>
+    </ul>
+    
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="subject">Subject:</label>
+            <input type="text" class="form-control" id="subject" name="subject" value="Notification: {{ employee.name }} - Probation Period Update" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="message">Message:</label>
+            <textarea class="form-control" id="message" name="message" rows="6" required>
+Dear Department Head,
+
+This is to inform you that {{ employee.name }} (Employee ID: {{ employee.employee_id }}) 
+in the {{ employee.department.name }} department has a probation period update.
+
+Current status: {{ employee.probation_status }}
+Days until probation ends: {{ employee.days_until_probation_end }}
+
+Please take the necessary action as required.
+
+Best regards,
+HR Department
+            </textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Send Email</button>
+        <a href="{% url 'employee_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

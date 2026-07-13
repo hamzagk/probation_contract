@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Employee - HR Portal{% endblock %}
+{% block page_title %}Delete Employee{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-xl shadow-md">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">Delete Employee</h3>
+
+    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <h4 class="font-medium text-red-800 mb-2">Warning!</h4>
+        <p class="text-red-700">You are about to delete the following employee:</p>
+        <div class="mt-2">
+            <p><strong>S.#:</strong> {{ employee.employee_id }}</p>
+            <p><strong>Name:</strong> {{ employee.name }}</p>
+            <p><strong>Designation:</strong> {{ employee.designation }}</p>
+            <p><strong>Department:</strong> {{ employee.department }}</p>
+        </div>
+    </div>
+
+    <p class="mb-6">Are you sure you want to delete this employee? This action cannot be undone.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="flex space-x-4">
+            <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition">
+                <i class="fas fa-trash mr-2"></i>Delete Employee
+            </button>
+            <a href="{% url 'employee_list' %}" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

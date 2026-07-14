@@ -75,4 +75,5 @@ urlpatterns = [
     path('contracts/report/', contract_report, name='contract_report'),
     path('contracts/api/statistics/', contract_statistics_api, name='contract_statistics_api'),
     path('contracts/refresh-status/', refresh_contract_status, name='refresh_contract_status'),
+    path('cron/trigger-emails/', views.trigger_automatic_emails_view, name='cron_trigger_emails'),
 ]

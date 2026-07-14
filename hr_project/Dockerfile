@@ -24,11 +24,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . /app/
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Make entrypoint executable
+RUN chmod +x /app/docker-entrypoint.sh
 
-# Expose port
-EXPOSE $PORT
+# Expose port (Koyeb sets $PORT; default to 8000 for local)
+ENV PORT=8000
+EXPOSE 8000
 
-# Run the application
-CMD gunicorn hr_project.wsgi:application --bind 0.0.0.0:$PORT
+# Entrypoint runs migrations + collectstatic, then the passed command
+# (gunicorn for web, or `celery -A hr_project worker` for the worker service)
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["gunicorn", "hr_project.wsgi:application", "--bind", "0.0.0.0:8000", "--log-file", "-"]

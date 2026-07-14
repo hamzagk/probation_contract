@@ -128,6 +128,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Honor the 'X-Forwarded-Proto' header for request.is_secure()
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# HTTPS hardening (Koyeb terminates TLS in front, so these are safe on Koyeb
+# and on any other platform that fronts Django with a TLS proxy).
+# Default to False so local dev over plain HTTP still works; set
+# SECURE_SSL_REDIRECT=True in the production environment.
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False, cast=bool)
+SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
+
 # Allow all host headers
 # ALLOWED_HOSTS = ['*']  # Commenting out to use the earlier configuration
 
@@ -153,6 +164,9 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='muhammad.hamza@giki.e
 
 # HR email for notifications
 HR_EMAIL = config('HR_EMAIL', default='muhammad.hamza@giki.edu.pk')  # Replace with actual HR email
+
+# Shared secret for external cron (cron-job.org / GitHub Actions) hitting /cron/trigger-emails/
+CRON_TOKEN = config('CRON_TOKEN', default='')
 MONTHLY_PROBATION_REPORT_TEST_RECIPIENT = config(
     'MONTHLY_PROBATION_REPORT_TEST_RECIPIENT',
     default=HR_EMAIL,

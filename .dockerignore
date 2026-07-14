@@ -1,0 +1,19 @@
+# Koyeb Docker build context — exclude local data so the image stays small
+# and so we never accidentally publish the local SQLite DB or uploaded media.
+
+**/db.sqlite3
+**/db.sqlite3-journal
+**/__pycache__
+**/*.pyc
+**/media
+**/staticfiles
+**/.venv
+**/venv
+**/tmpclaude-*-cwd
+**/.claude
+**/.git
+**/*.xlsx
+**/*.docx
+**/debug.log
+**/server.log
+**/server.err

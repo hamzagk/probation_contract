@@ -1389,3 +1389,37 @@ def probation_approval_ajax(request, employee_id):
     return JsonResponse({'success': False, 'message': 'Invalid request'})
 
 # Add other views as needed...
+
+
+def trigger_automatic_emails_view(request):
+    """
+    External-cron endpoint. Hit by cron-job.org / GitHub Actions on a schedule.
+
+    Auth: X-Cron-Token header must match settings.CRON_TOKEN.
+    Params: ?type=daily|weekly|monthly
+    """
+    from django.conf import settings
+    from hr_portal.tasks import (
+        send_monthly_probation_reports_task,
+        send_probation_notifications_task,
+        send_weekly_employees_report,
+    )
+
+    expected = getattr(settings, 'CRON_TOKEN', '')
+    provided = request.headers.get('X-Cron-Token', '')
+
+    if not expected or not provided or expected != provided:
+        return JsonResponse({'error': 'unauthorized'}, status=401)
+
+    email_type = request.GET.get('type', 'daily').lower()
+    dispatch = {
+        'daily': send_probation_notifications_task,
+        'weekly': send_weekly_employees_report,
+        'monthly': send_monthly_probation_reports_task,
+    }
+    if email_type not in dispatch:
+        return JsonResponse({'error': f"unknown type '{email_type}', expected one of {sorted(dispatch)}"}, status=400)
+
+    async_result = dispatch[email_type].delay()
+    return JsonResponse({'ok': True, 'type': email_type, 'task_id': async_result.id})
+
